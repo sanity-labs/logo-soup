@@ -6,7 +6,13 @@ A tiny React library that makes logos look good together.
 
 Real-world logos are messy. Some have padding, some don't. Some are dense and blocky, others are thin and airy. Put them in a row and they look chaotic.
 
+![Logos without normalization — different sizes, weights, and aspect ratios create visual chaos](https://cdn.sanity.io/images/3do82whm/next/5f6dcfd8982a3bc861da93e20e862363adc87978-5944x752.png?w=1200&q=75&fit=clip&auto=format)
+
 React Logo Soup fixes this automatically.
+
+![After normalization — the same logos appear balanced and harmonious](https://cdn.sanity.io/images/3do82whm/next/76b7eaf3d70a1d564d34fdb264776b7fb9420545-5620x612.png?w=1200&q=75&fit=clip&auto=format)
+
+Read the full deep-dive: [The Logo Soup Problem (and how to solve it)](https://www.sanity.io/blog/the-logo-soup-problem)
 
 ## Getting Started
 
@@ -192,6 +198,10 @@ import Image from "next/image";
 3. **Density Compensation** — Measures pixel density and adjusts size so dense logos don't overpower light ones
 
 All processing happens client-side using canvas. No AI, fully deterministic.
+
+## Porting to Other Frameworks
+
+The normalization core is plain JavaScript — React is just the wrapper. If you'd like to port Logo Soup to Vue, Svelte, Angular, or any other framework, go for it! We'd appreciate a link back to this repo, and let us know so we can link to your port from here.
 
 ## Development
 
