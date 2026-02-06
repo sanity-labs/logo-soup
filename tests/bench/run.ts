@@ -18,10 +18,7 @@ import {
   detectContentBoundingBox,
   measureWithContentDetection,
 } from "../../src/utils/measure";
-import {
-  calculateNormalizedDimensions,
-  createNormalizedLogo,
-} from "../../src/utils/normalize";
+import { createNormalizedLogo } from "../../src/utils/normalize";
 import { fmtNs, fmtP, type TTestResult, welchTTest } from "./welch";
 
 const origCreateElement = document.createElement.bind(document);
@@ -75,39 +72,29 @@ for (const file of svgFiles) {
   allLogos.push({ name: file.replace(/\.svg$/, ""), img, width, height });
 }
 
+const byPixels = [...allLogos].sort(
+  (a, b) => a.width * a.height - b.width * b.height,
+);
+const medianLogo = byPixels[Math.floor(byPixels.length / 2)]!;
+
 console.log(
-  `Rasterized ${allLogos.length} logos (${allLogos
-    .map((l) => `${l.width}x${l.height}`)
-    .slice(0, 5)
-    .join(", ")}…)`,
+  `Rasterized ${allLogos.length} logos, median: ${medianLogo.name} (${medianLogo.width}x${medianLogo.height})`,
 );
 
-// Render one representative logo at 3 scales for size-varied benchmarks
-const repSvgBuf = Buffer.from(
-  await Bun.file(join(LOGOS_DIR, svgFiles[0]!)).arrayBuffer(),
+const medianBuf = Buffer.from(
+  await Bun.file(join(LOGOS_DIR, `${medianLogo.name}.svg`)).arrayBuffer(),
 );
-
-interface SizedLogo {
-  label: string;
-  img: HTMLImageElement;
-}
-
-const sizedLogos: SizedLogo[] = [];
-for (const w of [64, 400, 1200]) {
-  const r = await loadSvgAtWidth(repSvgBuf, w);
-  sizedLogos.push({ label: `${r.width}x${r.height}`, img: r.img });
-}
-
-const [sizedSmall, sizedMedium, sizedLarge] = sizedLogos;
-
-const realMeasurements: MeasurementResult[] = allLogos.map((logo) =>
-  measureWithContentDetection(logo.img, DEFAULT_CONTRAST_THRESHOLD, true),
-);
+const bboxSmall = await loadSvgAtWidth(medianBuf, 64);
+const bboxLarge = await loadSvgAtWidth(medianBuf, 1200);
 
 const sources: LogoSource[] = allLogos.map((l) => ({
   src: `static/logos/${l.name}.svg`,
   alt: l.name,
 }));
+
+const realMeasurements: MeasurementResult[] = allLogos.map((logo) =>
+  measureWithContentDetection(logo.img, DEFAULT_CONTRAST_THRESHOLD, true),
+);
 
 const normalized20 = Array.from({ length: 20 }, (_, i) => {
   const idx = i % allLogos.length;
@@ -120,34 +107,7 @@ const normalized20 = Array.from({ length: 20 }, (_, i) => {
   );
 });
 
-const normalized100 = Array.from({ length: 100 }, (_, i) => {
-  const idx = i % allLogos.length;
-  return createNormalizedLogo(
-    sources[idx]!,
-    realMeasurements[idx]!,
-    DEFAULT_BASE_SIZE,
-    DEFAULT_SCALE_FACTOR,
-    DEFAULT_DENSITY_FACTOR,
-  );
-});
-
-function worstCaseRun(img: HTMLImageElement, count: number) {
-  for (let i = 0; i < count; i++) {
-    const m = measureWithContentDetection(
-      img,
-      DEFAULT_CONTRAST_THRESHOLD,
-      true,
-    );
-    const logo = createNormalizedLogo(
-      sources[i % sources.length]!,
-      m,
-      DEFAULT_BASE_SIZE,
-      DEFAULT_SCALE_FACTOR,
-      DEFAULT_DENSITY_FACTOR,
-    );
-    blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
-  }
-}
+const logos20 = allLogos.slice(0, 20);
 
 const TIME_BUDGET_MS = 2_000;
 const MIN_SAMPLES = 30;
@@ -193,42 +153,36 @@ function stats(samples: number[]) {
   return { mean: m, min, max, stddev };
 }
 
-const benchCalcDimsWithDensity = () =>
-  calculateNormalizedDimensions(
-    realMeasurements[0]!,
-    DEFAULT_BASE_SIZE,
-    DEFAULT_SCALE_FACTOR,
-    DEFAULT_DENSITY_FACTOR,
-  );
-
 const benchGetVCT20 = () => {
   for (let i = 0; i < 20; i++)
     getVisualCenterTransform(normalized20[i]!, DEFAULT_ALIGN_BY);
 };
 
-const benchFullPipelineDensityOn = () =>
-  measureWithContentDetection(
-    sizedMedium!.img,
-    DEFAULT_CONTRAST_THRESHOLD,
-    true,
-  );
+const benchMeasure = () =>
+  measureWithContentDetection(medianLogo.img, DEFAULT_CONTRAST_THRESHOLD, true);
 
-const keyBenchmarks: Record<string, () => void> = {
-  "getVCT x 20": benchGetVCT20,
-  "calcDims with density": benchCalcDimsWithDensity,
-  createNormalizedLogo: () =>
-    createNormalizedLogo(
-      sources[0]!,
-      realMeasurements[0]!,
+const benchMount20 = () => {
+  for (let i = 0; i < 20; i++) {
+    const m = measureWithContentDetection(
+      logos20[i]!.img,
+      DEFAULT_CONTRAST_THRESHOLD,
+      true,
+    );
+    const logo = createNormalizedLogo(
+      sources[i]!,
+      m,
       DEFAULT_BASE_SIZE,
       DEFAULT_SCALE_FACTOR,
       DEFAULT_DENSITY_FACTOR,
-    ),
-  [`fullPipeline ${sizedMedium!.label} density ON`]: benchFullPipelineDensityOn,
-  [`worstCase 1 x ${sizedMedium!.label}`]: () =>
-    worstCaseRun(sizedMedium!.img, 1),
-  [`worstCase 20 x ${sizedMedium!.label}`]: () =>
-    worstCaseRun(sizedMedium!.img, 20),
+    );
+    blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
+  }
+};
+
+const keyBenchmarks: Record<string, () => void> = {
+  [`measure (${medianLogo.width}x${medianLogo.height})`]: benchMeasure,
+  "getVCT x 20 (per render)": benchGetVCT20,
+  "mount 20 logos (default settings)": benchMount20,
 };
 
 interface ABComparison {
@@ -239,24 +193,26 @@ interface ABComparison {
 
 const abComparisons: ABComparison[] = [
   {
-    name: `Density compensation (1 logo, ${sizedMedium!.label})`,
-    a: { label: "calcDims WITH density", fn: benchCalcDimsWithDensity },
+    name: `Density: ON vs OFF (${medianLogo.width}x${medianLogo.height})`,
+    a: {
+      label: "density ON",
+      fn: benchMeasure,
+    },
     b: {
-      label: "calcDims WITHOUT density",
+      label: "density OFF",
       fn: () =>
-        calculateNormalizedDimensions(
-          realMeasurements[0]!,
-          DEFAULT_BASE_SIZE,
-          DEFAULT_SCALE_FACTOR,
-          0,
+        measureWithContentDetection(
+          medianLogo.img,
+          DEFAULT_CONTRAST_THRESHOLD,
+          false,
         ),
     },
   },
   {
-    name: "Alignment mode: visual-center-y vs bounds (20 logos)",
-    a: { label: "visual-center-y x 20", fn: benchGetVCT20 },
+    name: "Alignment: visual-center-y vs bounds (20 logos)",
+    a: { label: "visual-center-y", fn: benchGetVCT20 },
     b: {
-      label: "bounds x 20",
+      label: "bounds",
       fn: () => {
         for (let i = 0; i < 20; i++)
           getVisualCenterTransform(normalized20[i]!, "bounds");
@@ -264,46 +220,22 @@ const abComparisons: ABComparison[] = [
     },
   },
   {
-    name: `Full pipeline: density ON vs OFF (1 logo, ${sizedMedium!.label})`,
-    a: { label: "density ON", fn: benchFullPipelineDensityOn },
-    b: {
-      label: "density OFF",
+    name: `Bbox scaling: ${bboxLarge.width}x${bboxLarge.height} vs ${bboxSmall.width}x${bboxSmall.height}`,
+    a: {
+      label: `${bboxLarge.width}x${bboxLarge.height}`,
       fn: () =>
-        measureWithContentDetection(
-          sizedMedium!.img,
+        detectContentBoundingBox(
+          bboxLarge.img as unknown as HTMLImageElement,
           DEFAULT_CONTRAST_THRESHOLD,
-          false,
         ),
     },
-  },
-  {
-    name: `Bounding box scaling: ${sizedLarge!.label} vs ${sizedSmall!.label}`,
-    a: {
-      label: sizedLarge!.label,
-      fn: () =>
-        detectContentBoundingBox(sizedLarge!.img, DEFAULT_CONTRAST_THRESHOLD),
-    },
     b: {
-      label: sizedSmall!.label,
+      label: `${bboxSmall.width}x${bboxSmall.height}`,
       fn: () =>
-        detectContentBoundingBox(sizedSmall!.img, DEFAULT_CONTRAST_THRESHOLD),
-    },
-  },
-  {
-    name: "Per-render overhead: 100 logos vs 20 logos",
-    a: {
-      label: "100 logos",
-      fn: () => {
-        for (let i = 0; i < 100; i++)
-          getVisualCenterTransform(normalized100[i]!, DEFAULT_ALIGN_BY);
-      },
-    },
-    b: {
-      label: "20 logos",
-      fn: () => {
-        for (let i = 0; i < 20; i++)
-          getVisualCenterTransform(normalized20[i]!, DEFAULT_ALIGN_BY);
-      },
+        detectContentBoundingBox(
+          bboxSmall.img as unknown as HTMLImageElement,
+          DEFAULT_CONTRAST_THRESHOLD,
+        ),
     },
   },
 ];
