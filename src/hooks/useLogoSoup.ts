@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 import {
   DEFAULT_BASE_SIZE,
   DEFAULT_CONTRAST_THRESHOLD,
@@ -18,6 +18,41 @@ import {
 } from "../utils/measure";
 import { createNormalizedLogo, normalizeSource } from "../utils/normalize";
 
+type State = {
+  isLoading: boolean;
+  normalizedLogos: NormalizedLogo[];
+  error: Error | null;
+};
+
+type Action =
+  | { type: "loading" }
+  | { type: "success"; normalizedLogos: NormalizedLogo[] }
+  | { type: "error"; error: Error }
+  | { type: "empty" };
+
+function reducer(_state: State, action: Action): State {
+  switch (action.type) {
+    case "loading":
+      return { isLoading: true, normalizedLogos: [], error: null };
+    case "success":
+      return {
+        isLoading: false,
+        normalizedLogos: action.normalizedLogos,
+        error: null,
+      };
+    case "error":
+      return { isLoading: false, normalizedLogos: [], error: action.error };
+    case "empty":
+      return { isLoading: false, normalizedLogos: [], error: null };
+  }
+}
+
+const INITIAL_STATE: State = {
+  isLoading: true,
+  normalizedLogos: [],
+  error: null,
+};
+
 export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
   const {
     logos,
@@ -29,66 +64,59 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     cropToContent = false,
   } = options;
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [normalizedLogos, setNormalizedLogos] = useState<NormalizedLogo[]>([]);
-  const [error, setError] = useState<Error | null>(null);
+  const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
   useEffect(() => {
     if (logos.length === 0) {
-      setIsLoading(false);
-      setNormalizedLogos([]);
+      dispatch({ type: "empty" });
       return;
     }
 
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
+    dispatch({ type: "loading" });
 
-    async function processLogos() {
-      try {
-        const sources: LogoSource[] = logos.map(normalizeSource);
-        const results: NormalizedLogo[] = [];
+    const sources: LogoSource[] = logos.map(normalizeSource);
 
-        for (const source of sources) {
-          if (cancelled) return;
+    Promise.allSettled(
+      sources.map(async (source) => {
+        const img = await loadImage(source.src);
 
-          const img = await loadImage(source.src);
-          const measurement = measureWithContentDetection(
-            img,
-            contrastThreshold,
-            densityAware,
-          );
+        if (cancelled) throw new Error("cancelled");
 
-          const effectiveDensityFactor = densityAware ? densityFactor : 0;
+        const measurement = measureWithContentDetection(
+          img,
+          contrastThreshold,
+          densityAware,
+        );
 
-          const normalized = createNormalizedLogo(
-            source,
-            measurement,
-            baseSize,
-            scaleFactor,
-            effectiveDensityFactor,
-          );
+        const effectiveDensityFactor = densityAware ? densityFactor : 0;
 
-          if (cropToContent && measurement.contentBox) {
-            normalized.croppedSrc = cropToDataUrl(img, measurement.contentBox);
-          }
+        const normalized = createNormalizedLogo(
+          source,
+          measurement,
+          baseSize,
+          scaleFactor,
+          effectiveDensityFactor,
+        );
 
-          results.push(normalized);
+        if (cropToContent && measurement.contentBox) {
+          normalized.croppedSrc = cropToDataUrl(img, measurement.contentBox);
         }
 
-        if (!cancelled) {
-          setNormalizedLogos(results);
-          setIsLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setIsLoading(false);
-        }
-      }
-    }
+        return normalized;
+      }),
+    ).then((settled) => {
+      if (cancelled) return;
 
-    processLogos();
+      const results = settled
+        .filter(
+          (r): r is PromiseFulfilledResult<NormalizedLogo> =>
+            r.status === "fulfilled",
+        )
+        .map((r) => r.value);
+
+      dispatch({ type: "success", normalizedLogos: results });
+    });
 
     return () => {
       cancelled = true;
@@ -104,9 +132,9 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
   ]);
 
   return {
-    isLoading,
-    isReady: !isLoading && error === null,
-    normalizedLogos,
-    error,
+    isLoading: state.isLoading,
+    isReady: !state.isLoading && state.error === null,
+    normalizedLogos: state.normalizedLogos,
+    error: state.error,
   };
 }
