@@ -16,6 +16,7 @@ import type { LogoSource, MeasurementResult } from "../../src/types";
 import { getVisualCenterTransform } from "../../src/utils/getVisualCenterTransform";
 import {
   detectContentBoundingBox,
+  measureImage,
   measureWithContentDetection,
 } from "../../src/utils/measure";
 import { createNormalizedLogo } from "../../src/utils/normalize";
@@ -179,9 +180,24 @@ const benchMount20 = () => {
   }
 };
 
+const benchMount20Baseline = () => {
+  for (let i = 0; i < 20; i++) {
+    const m = measureImage(logos20[i]!.img);
+    const logo = createNormalizedLogo(
+      sources[i]!,
+      m,
+      DEFAULT_BASE_SIZE,
+      DEFAULT_SCALE_FACTOR,
+      0,
+    );
+    blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
+  }
+};
+
 const keyBenchmarks: Record<string, () => void> = {
   [`measure (${medianLogo.width}x${medianLogo.height})`]: benchMeasure,
   "getVCT x 20 (per render)": benchGetVCT20,
+  "mount 20 logos (no pixel scanning)": benchMount20Baseline,
   "mount 20 logos (default settings)": benchMount20,
 };
 
