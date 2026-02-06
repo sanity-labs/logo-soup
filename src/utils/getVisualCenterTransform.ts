@@ -24,7 +24,9 @@ export function getVisualCenterTransform(
       : 0;
 
   if (Math.abs(offsetX) > 0.5 || Math.abs(offsetY) > 0.5) {
-    return `translate(${offsetX.toFixed(1)}px, ${offsetY.toFixed(1)}px)`;
+    const rx = Math.round(offsetX * 10) / 10;
+    const ry = Math.round(offsetY * 10) / 10;
+    return `translate(${rx}px, ${ry}px)`;
   }
 
   return undefined;
