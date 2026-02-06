@@ -9,6 +9,7 @@ import {
 } from "../constants";
 import type {
   LogoSource,
+  MeasurementResult,
   NormalizedLogo,
   UseLogoSoupOptions,
   UseLogoSoupResult,
@@ -23,6 +24,12 @@ import {
   logosEqual,
   normalizeSource,
 } from "../utils/normalize";
+
+interface CachedEntry {
+  img: HTMLImageElement;
+  measurement: MeasurementResult;
+  blobUrl?: string;
+}
 
 type State = {
   isLoading: boolean;
@@ -59,6 +66,22 @@ const INITIAL_STATE: State = {
   error: null,
 };
 
+function clearCache(cache: Map<string, CachedEntry>) {
+  for (const entry of cache.values()) {
+    if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
+  }
+  cache.clear();
+}
+
+function pruneCache(cache: Map<string, CachedEntry>, activeSrcs: Set<string>) {
+  for (const [src, entry] of cache) {
+    if (!activeSrcs.has(src)) {
+      if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
+      cache.delete(src);
+    }
+  }
+}
+
 export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
   const {
     logos,
@@ -78,48 +101,111 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
   }
   const stableLogos = logosRef.current;
 
+  const cacheRef = useRef(new Map<string, CachedEntry>());
+  const cacheKeyRef = useRef({
+    contrastThreshold: NaN,
+    densityAware: false,
+  });
+
+  useEffect(() => {
+    return () => clearCache(cacheRef.current);
+  }, []);
+
   useEffect(() => {
     if (stableLogos.length === 0) {
       dispatch({ type: "empty" });
       return;
     }
 
-    let cancelled = false;
-    const blobUrls: string[] = [];
-    dispatch({ type: "loading" });
+    const cache = cacheRef.current;
+    const prevKey = cacheKeyRef.current;
+
+    if (
+      prevKey.contrastThreshold !== contrastThreshold ||
+      prevKey.densityAware !== densityAware
+    ) {
+      clearCache(cache);
+      cacheKeyRef.current = { contrastThreshold, densityAware };
+    }
 
     const sources: LogoSource[] = stableLogos.map(normalizeSource);
+    const activeSrcs = new Set(sources.map((s) => s.src));
+    pruneCache(cache, activeSrcs);
+
+    const allCached = sources.every((s) => cache.has(s.src));
+    const needsCrop =
+      cropToContent &&
+      sources.some((s) => {
+        const entry = cache.get(s.src);
+        return entry && !entry.blobUrl && entry.measurement.contentBox;
+      });
+
+    if (allCached && !needsCrop) {
+      const effectiveDensityFactor = densityAware ? densityFactor : 0;
+      const results = sources.map((source) => {
+        const entry = cache.get(source.src)!;
+        const normalized = createNormalizedLogo(
+          source,
+          entry.measurement,
+          baseSize,
+          scaleFactor,
+          effectiveDensityFactor,
+        );
+        if (cropToContent && entry.blobUrl) {
+          normalized.croppedSrc = entry.blobUrl;
+        }
+        return normalized;
+      });
+      dispatch({ type: "success", normalizedLogos: results });
+      return;
+    }
+
+    let cancelled = false;
+    if (!allCached) {
+      dispatch({ type: "loading" });
+    }
 
     Promise.allSettled(
       sources.map(async (source) => {
-        const img = await loadImage(source.src);
+        let entry = cache.get(source.src);
 
-        if (cancelled) throw new Error("cancelled");
+        if (!entry) {
+          const img = await loadImage(source.src);
+          if (cancelled) throw new Error("cancelled");
 
-        const measurement = measureWithContentDetection(
-          img,
-          contrastThreshold,
-          densityAware,
-        );
+          const measurement = measureWithContentDetection(
+            img,
+            contrastThreshold,
+            densityAware,
+          );
+          entry = { img, measurement };
+          cache.set(source.src, entry);
+        }
 
         const effectiveDensityFactor = densityAware ? densityFactor : 0;
 
         const normalized = createNormalizedLogo(
           source,
-          measurement,
+          entry.measurement,
           baseSize,
           scaleFactor,
           effectiveDensityFactor,
         );
 
-        if (cropToContent && measurement.contentBox) {
-          const url = await cropToBlobUrl(img, measurement.contentBox);
+        if (cropToContent && entry.measurement.contentBox && !entry.blobUrl) {
+          const url = await cropToBlobUrl(
+            entry.img,
+            entry.measurement.contentBox,
+          );
           if (cancelled) {
             URL.revokeObjectURL(url);
             throw new Error("cancelled");
           }
-          blobUrls.push(url);
-          normalized.croppedSrc = url;
+          entry.blobUrl = url;
+        }
+
+        if (cropToContent && entry.blobUrl) {
+          normalized.croppedSrc = entry.blobUrl;
         }
 
         return normalized;
@@ -150,9 +236,6 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
 
     return () => {
       cancelled = true;
-      for (const url of blobUrls) {
-        URL.revokeObjectURL(url);
-      }
     };
   }, [
     stableLogos,
