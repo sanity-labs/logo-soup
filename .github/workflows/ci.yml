@@ -30,15 +30,6 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
 
-      - name: Resolve job URL
-        run: |
-          job=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --jq '.jobs[] | select(.name == "bench")')
-          url=$(echo "$job" | jq -r '.html_url')
-          step=$(echo "$job" | jq -r '.steps[] | select(.name == "Benchmark (head)") | .number')
-          echo "BENCH_JOB_URL=${url}#step:${step}:1" >> "$GITHUB_ENV"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Benchmark (head)
         run: BENCH_SAMPLES_PATH=head-samples.json bun run bench
         env:
@@ -55,9 +46,7 @@ jobs:
 
       - name: Compare against main
         if: github.event_name == 'pull_request'
-        id: compare
-        run: |
-          bun tests/bench/compare.ts /tmp/base-samples.json head-samples.json
+        run: bun tests/bench/compare.ts /tmp/base-samples.json head-samples.json
         continue-on-error: true
         env:
           NODE_ENV: development
@@ -65,23 +54,34 @@ jobs:
       - name: Post results
         if: always()
         run: |
+          job_url=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
+            --jq '.jobs[] | select(.name == "bench") | .html_url + "#step:" + (.steps[] | select(.name == "Benchmark (head)") | .number | tostring) + ":1"')
+
+          : > /tmp/summary.md
           if [ -f benchmark-comparison.md ]; then
-            cat benchmark-comparison.md >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
+            cat benchmark-comparison.md >> /tmp/summary.md
+            echo "" >> /tmp/summary.md
           fi
           if [ -f benchmark-report.md ]; then
-            cat benchmark-report.md >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "$job_url" ]; then
+              sed "1a\\
+\\
+> Full benchmark output in the [CI job logs](${job_url})." benchmark-report.md >> /tmp/summary.md
+            else
+              cat benchmark-report.md >> /tmp/summary.md
+            fi
           fi
+
+          [ -s /tmp/summary.md ] && cat /tmp/summary.md >> "$GITHUB_STEP_SUMMARY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Comment on PR
         if: github.event_name == 'pull_request' && always()
         run: |
-          : > /tmp/pr-comment.md
-          [ -f benchmark-comparison.md ] && cat benchmark-comparison.md >> /tmp/pr-comment.md && echo "" >> /tmp/pr-comment.md
-          [ -f benchmark-report.md ] && cat benchmark-report.md >> /tmp/pr-comment.md
-          if [ -s /tmp/pr-comment.md ]; then
-            gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/pr-comment.md --edit-last 2>/dev/null || \
-            gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/pr-comment.md
+          if [ -s /tmp/summary.md ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/summary.md --edit-last 2>/dev/null || \
+            gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/summary.md
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

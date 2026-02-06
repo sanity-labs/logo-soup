@@ -571,14 +571,9 @@ for (const [name, fn] of Object.entries(keyBenchmarks)) {
 
 // Markdown report for CI
 
-const jobUrl = process.env.BENCH_JOB_URL || null;
-
 const md: string[] = [
   "# react-logo-soup Benchmark Report",
   "",
-  jobUrl
-    ? `> Full benchmark output in the [CI job logs](${jobUrl}). This summary covers statistical significance tests.`
-    : "> This summary covers statistical significance tests.",
   "",
   `> Test fixtures: ${LOGO_DIMS.length} logo dimensions from real SVGs in static/logos/. ` +
     `${PVALUE_ITERS} samples per group, ${PVALUE_WARMUP} warmup iterations.`,
