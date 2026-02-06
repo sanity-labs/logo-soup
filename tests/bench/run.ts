@@ -20,7 +20,7 @@ import {
   measureWithContentDetection,
 } from "../../src/utils/measure";
 import { createNormalizedLogo } from "../../src/utils/normalize";
-import { fmtNs, fmtP, type TTestResult, welchTTest } from "./welch";
+import { fmtNs, fmtP, welchTTest } from "./welch";
 
 const origCreateElement = document.createElement.bind(document);
 document.createElement = ((tag: string, options?: ElementCreationOptions) => {
@@ -195,91 +195,12 @@ const benchMount20Baseline = () => {
   }
 };
 
-const benchReNormalize20 = () => {
-  for (let i = 0; i < 20; i++) {
-    const idx = i % allLogos.length;
-    const logo = createNormalizedLogo(
-      sources[idx]!,
-      realMeasurements[idx]!,
-      DEFAULT_BASE_SIZE,
-      DEFAULT_SCALE_FACTOR,
-      DEFAULT_DENSITY_FACTOR,
-    );
-    blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
-  }
-};
-
 const keyBenchmarks: Record<string, () => void> = {
   "content detection (1 logo)": benchMeasure,
   "render pass (20 logos)": benchGetVCT20,
   "mount 20 logos (no detection)": benchMount20Baseline,
   "mount 20 logos (defaults)": benchMount20,
 };
-
-interface ABComparison {
-  name: string;
-  a: { label: string; fn: () => void };
-  b: { label: string; fn: () => void };
-}
-
-const medianMeasurement = realMeasurements[allLogos.indexOf(medianLogo)]!;
-
-const abComparisons: ABComparison[] = [
-  {
-    name: "densityAware: true vs false",
-    a: {
-      label: "true",
-      fn: benchMeasure,
-    },
-    b: {
-      label: "false",
-      fn: () =>
-        measureWithContentDetection(
-          medianLogo.img,
-          DEFAULT_CONTRAST_THRESHOLD,
-          false,
-        ),
-    },
-  },
-  {
-    name: "alignBy: visual-center-y vs bounds",
-    a: { label: "visual-center-y", fn: benchGetVCT20 },
-    b: {
-      label: "bounds",
-      fn: () => {
-        for (let i = 0; i < 20; i++)
-          getVisualCenterTransform(normalized20[i]!, "bounds");
-      },
-    },
-  },
-  {
-    name: "cropToContent: true vs false",
-    a: {
-      label: "true",
-      fn: () => {
-        if (medianMeasurement.contentBox)
-          blackhole(
-            cropToDataUrl(medianLogo.img, medianMeasurement.contentBox),
-          );
-      },
-    },
-    b: {
-      label: "false (noop)",
-      fn: () => {},
-    },
-  },
-  {
-    name: "layout update: full mount vs cached",
-    a: {
-      label: "full mount",
-      fn: benchMount20,
-    },
-    b: {
-      label: "cached re-normalize",
-      fn: benchReNormalize20,
-    },
-  },
-];
 
 console.log();
 console.log("─".repeat(72));
@@ -298,56 +219,6 @@ for (const [name, fn] of Object.entries(keyBenchmarks)) {
   console.log(
     `  ${name.padEnd(38)} ${fmtNs(s.mean).padStart(10)} ± ${fmtNs(s.stddev).padStart(10)}  (n=${String(samples.length).padStart(4)}, min ${fmtNs(s.min)}, max ${fmtNs(s.max)})`,
   );
-}
-
-interface ABResult {
-  name: string;
-  aLabel: string;
-  bLabel: string;
-  aMean: string;
-  bMean: string;
-  pctChange: number;
-  result: TTestResult;
-}
-
-const abResults: ABResult[] = [];
-
-if (!QUICK) {
-  console.log();
-  console.log("─".repeat(72));
-  console.log("  FEATURE COMPARISONS (Welch's t-test, two-tailed)");
-  console.log("  Legend: * p<0.05  ** p<0.01  *** p<0.001");
-  console.log("─".repeat(72));
-
-  for (const comp of abComparisons) {
-    const samplesA = collectSamples(comp.a.fn);
-    const samplesB = collectSamples(comp.b.fn);
-    const result = welchTTest(samplesA, samplesB);
-    const sA = stats(samplesA);
-    const sB = stats(samplesB);
-    const pctChange = sB.mean !== 0 ? ((sA.mean - sB.mean) / sB.mean) * 100 : 0;
-
-    const sig = result.significant ? `YES ${result.marker}` : "NO";
-    const sign = pctChange > 0 ? "+" : "";
-    console.log(`  > ${comp.name}`);
-    console.log(
-      `    ${comp.a.label}: ${fmtNs(sA.mean)}  vs  ${comp.b.label}: ${fmtNs(sB.mean)}  (${sign}${pctChange.toFixed(1)}%)`,
-    );
-    console.log(`    p=${fmtP(result.p)}  significant=${sig}`);
-    console.log();
-
-    abResults.push({
-      name: comp.name,
-      aLabel: comp.a.label,
-      bLabel: comp.b.label,
-      aMean: fmtNs(sA.mean),
-      bMean: fmtNs(sB.mean),
-      pctChange,
-      result,
-    });
-  }
-} else {
-  console.log("\n  Skipping AB comparisons in quick mode.");
 }
 
 const md: string[] = [
@@ -369,7 +240,74 @@ for (const [name, samples] of Object.entries(benchSamples)) {
 
 md.push("");
 
-if (abResults.length > 0) {
+if (!QUICK) {
+  const medianMeasurement = realMeasurements[allLogos.indexOf(medianLogo)]!;
+
+  const benchReNormalize20 = () => {
+    for (let i = 0; i < 20; i++) {
+      const idx = i % allLogos.length;
+      const logo = createNormalizedLogo(
+        sources[idx]!,
+        realMeasurements[idx]!,
+        DEFAULT_BASE_SIZE,
+        DEFAULT_SCALE_FACTOR,
+        DEFAULT_DENSITY_FACTOR,
+      );
+      blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
+    }
+  };
+
+  const abComparisons = [
+    {
+      name: "densityAware: true vs false",
+      a: { label: "true", fn: benchMeasure },
+      b: {
+        label: "false",
+        fn: () =>
+          measureWithContentDetection(
+            medianLogo.img,
+            DEFAULT_CONTRAST_THRESHOLD,
+            false,
+          ),
+      },
+    },
+    {
+      name: "alignBy: visual-center-y vs bounds",
+      a: { label: "visual-center-y", fn: benchGetVCT20 },
+      b: {
+        label: "bounds",
+        fn: () => {
+          for (let i = 0; i < 20; i++)
+            getVisualCenterTransform(normalized20[i]!, "bounds");
+        },
+      },
+    },
+    {
+      name: "cropToContent: true vs false",
+      a: {
+        label: "true",
+        fn: () => {
+          if (medianMeasurement.contentBox)
+            blackhole(
+              cropToDataUrl(medianLogo.img, medianMeasurement.contentBox),
+            );
+        },
+      },
+      b: { label: "false (noop)", fn: () => {} },
+    },
+    {
+      name: "layout update: full mount vs cached",
+      a: { label: "full mount", fn: benchMount20 },
+      b: { label: "cached re-normalize", fn: benchReNormalize20 },
+    },
+  ];
+
+  console.log();
+  console.log("─".repeat(72));
+  console.log("  FEATURE COMPARISONS (Welch's t-test, two-tailed)");
+  console.log("  Legend: * p<0.05  ** p<0.01  *** p<0.001");
+  console.log("─".repeat(72));
+
   md.push(
     "### Feature Comparisons (Welch's t-test)",
     "",
@@ -377,11 +315,25 @@ if (abResults.length > 0) {
     "|:-----|--:|--:|------:|:----|",
   );
 
-  for (const r of abResults) {
-    const sig = r.result.significant ? `YES ${r.result.marker}` : "NO";
-    const sign = r.pctChange > 0 ? "+" : "";
+  for (const comp of abComparisons) {
+    const samplesA = collectSamples(comp.a.fn);
+    const samplesB = collectSamples(comp.b.fn);
+    const result = welchTTest(samplesA, samplesB);
+    const sA = stats(samplesA);
+    const sB = stats(samplesB);
+    const pctChange = sB.mean !== 0 ? ((sA.mean - sB.mean) / sB.mean) * 100 : 0;
+
+    const sig = result.significant ? `YES ${result.marker}` : "NO";
+    const sign = pctChange > 0 ? "+" : "";
+    console.log(`  > ${comp.name}`);
+    console.log(
+      `    ${comp.a.label}: ${fmtNs(sA.mean)}  vs  ${comp.b.label}: ${fmtNs(sB.mean)}  (${sign}${pctChange.toFixed(1)}%)`,
+    );
+    console.log(`    p=${fmtP(result.p)}  significant=${sig}`);
+    console.log();
+
     md.push(
-      `| ${r.name} | ${r.aMean} | ${r.bMean} | ${sign}${r.pctChange.toFixed(1)}% | ${fmtP(r.result.p)} ${sig} |`,
+      `| ${comp.name} | ${fmtNs(sA.mean)} | ${fmtNs(sB.mean)} | ${sign}${pctChange.toFixed(1)}% | ${fmtP(result.p)} ${sig} |`,
     );
   }
 
@@ -390,6 +342,8 @@ if (abResults.length > 0) {
     "A/B columns match the order in the test name. Sig: `*` p<0.05, `**` p<0.01, `***` p<0.001.",
     "",
   );
+} else {
+  console.log("\n  Skipping AB comparisons in quick mode.");
 }
 
 const outDir = process.env.BENCH_OUT_DIR ?? "tmp";
