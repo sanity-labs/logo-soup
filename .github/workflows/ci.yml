@@ -46,7 +46,7 @@ jobs:
 
       - name: Compare against main
         if: github.event_name == 'pull_request'
-        run: bun tests/bench/compare.ts /tmp/base-samples.json head-samples.json
+        run: bun tests/bench/compare.ts /tmp/base-samples.json head-samples.json "$GITHUB_HEAD_REF"
         continue-on-error: true
         env:
           NODE_ENV: development
@@ -73,7 +73,7 @@ jobs:
             if [ -n "$job_url" ]; then
               sed "1a\\
 \\
-> Full benchmark output in the [CI job logs](${job_url})." benchmark-report.md >> /tmp/summary.md
+Full benchmark output in the [CI job logs](${job_url})." benchmark-report.md >> /tmp/summary.md
             else
               cat benchmark-report.md >> /tmp/summary.md
             fi

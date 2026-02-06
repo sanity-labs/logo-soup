@@ -1,7 +1,8 @@
 import { jStat } from "jstat";
 import { welchTTest, fmtNs, fmtP } from "./welch";
 
-const [baseFile, headFile] = process.argv.slice(2);
+const [baseFile, headFile, branchName] = process.argv.slice(2);
+const headLabel = branchName || "HEAD";
 
 if (!baseFile || !headFile) {
   console.error("Usage: bun tests/bench/compare.ts <base.json> <head.json>");
@@ -62,7 +63,7 @@ for (const name of Object.keys(base)) {
 const regressions = rows.filter((r) => r.verdict === "REGRESSION");
 
 console.log("─".repeat(80));
-console.log("  BENCHMARK COMPARISON: main vs PR");
+console.log(`  BENCHMARK COMPARISON: main vs ${headLabel}`);
 console.log("─".repeat(80));
 
 for (const r of rows) {
@@ -92,11 +93,11 @@ console.log("─".repeat(80));
 // Markdown report
 
 const md: string[] = [
-  "# Benchmark Comparison: main vs PR",
+  `# Benchmark Comparison: main vs ${headLabel}`,
   "",
-  `> Threshold: ${THRESHOLD_PCT}%+ change, >${THRESHOLD_ABS_NS / 1_000}us absolute delta, and statistically significant (p<0.05)`,
+  `Threshold: ${THRESHOLD_PCT}%+ change, >${THRESHOLD_ABS_NS / 1_000}us absolute delta, and statistically significant (p<0.05).`,
   "",
-  "| Benchmark | main | PR | Change | p-value | Verdict |",
+  `| Benchmark | main | ${headLabel} | Change | p-value | Verdict |`,
   "|:----------|:-----|:---|:-------|:--------|:--------|",
 ];
 

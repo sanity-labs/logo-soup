@@ -574,8 +574,7 @@ for (const [name, fn] of Object.entries(keyBenchmarks)) {
 const md: string[] = [
   "# react-logo-soup Benchmark Report",
   "",
-  "",
-  `> Test fixtures: ${LOGO_DIMS.length} logo dimensions from real SVGs in static/logos/. ` +
+  `Test fixtures: ${LOGO_DIMS.length} logo dimensions from real SVGs in static/logos/. ` +
     `${PVALUE_ITERS} samples per group, ${PVALUE_WARMUP} warmup iterations.`,
   "",
   "## Feature Comparisons (Welch's t-test)",
@@ -594,7 +593,7 @@ for (const r of pResults) {
 
 md.push("");
 md.push(
-  "> A/B columns match the order in the test name. Sig: `*` p<0.05, `**` p<0.01, `***` p<0.001, `-` not significant.",
+  "A/B columns match the order in the test name. Sig: `*` p<0.05, `**` p<0.01, `***` p<0.001.",
 );
 md.push("");
 
