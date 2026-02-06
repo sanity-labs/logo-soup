@@ -6,11 +6,11 @@ A tiny React library that makes logos look good together.
 
 Real-world logos are messy. Some have padding, some don't. Some are dense and blocky, others are thin and airy. Put them in a row and they look chaotic.
 
-![Logos without normalization — different sizes, weights, and aspect ratios create visual chaos](stories/logos/before.png)
+![Logos without normalization — different sizes, weights, and aspect ratios create visual chaos](static/before.png)
 
 React Logo Soup fixes this automatically.
 
-![After normalization — the same logos appear balanced and harmonious](stories/logos/after.png)
+![After normalization — the same logos appear balanced and harmonious](static/after.png)
 
 Read the full deep-dive: [The Logo Soup Problem (and how to solve it)](https://www.sanity.io/blog/the-logo-soup-problem)
 
