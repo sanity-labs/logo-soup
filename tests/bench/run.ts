@@ -356,7 +356,18 @@ const md: string[] = [
   `Test fixtures: ${allLogos.length} real SVGs from static/logos/. ` +
     `${TIME_BUDGET_MS}ms budget per bench, ${MIN_SAMPLES}-${MAX_SAMPLES} samples.`,
   "",
+  "| Benchmark | Mean | ± Stddev | Samples |",
+  "|:----------|-----:|---------:|--------:|",
 ];
+
+for (const [name, samples] of Object.entries(benchSamples)) {
+  const s = stats(samples);
+  md.push(
+    `| ${name} | ${fmtNs(s.mean)} | ${fmtNs(s.stddev)} | ${samples.length} |`,
+  );
+}
+
+md.push("");
 
 if (abResults.length > 0) {
   md.push(
