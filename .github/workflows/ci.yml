@@ -16,3 +16,64 @@ jobs:
       - run: bun test
         env:
           NODE_ENV: development
+
+  bench:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      - name: Benchmark (head)
+        run: BENCH_SAMPLES_PATH=head-samples.json bun run bench
+        env:
+          NODE_ENV: development
+
+      - name: Benchmark (main baseline)
+        if: github.event_name == 'pull_request'
+        run: |
+          cp head-samples.json /tmp/head-samples.json
+          cp benchmark-report.md /tmp/benchmark-report.md
+
+          git checkout ${{ github.event.pull_request.base.sha }}
+          bun install --frozen-lockfile
+          BENCH_SAMPLES_PATH=/tmp/base-samples.json bun run bench
+
+          git checkout ${{ github.sha }}
+          bun install --frozen-lockfile
+
+          cp /tmp/head-samples.json head-samples.json
+          cp /tmp/benchmark-report.md benchmark-report.md
+        env:
+          NODE_ENV: development
+
+      - name: Compare against main
+        if: github.event_name == 'pull_request'
+        id: compare
+        run: |
+          bun tests/bench/compare.ts /tmp/base-samples.json head-samples.json || true
+        env:
+          NODE_ENV: development
+
+      - name: Post results
+        if: always()
+        run: |
+          if [ -f benchmark-comparison.md ]; then
+            cat benchmark-comparison.md >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f benchmark-report.md ]; then
+            cat benchmark-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmark-report.md
+            benchmark-comparison.md
+            head-samples.json
+          retention-days: 30
