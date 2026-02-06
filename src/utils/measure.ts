@@ -97,15 +97,21 @@ export function measureWithContentDetection(
   const w = img.naturalWidth;
   const h = img.naturalHeight;
 
-  const ctx = getReusableContext(w, h);
+  const ratio = w * h > 10_000 ? Math.sqrt(10_000 / (w * h)) : 1;
+  const sw = Math.max(1, Math.round(w * ratio));
+  const sh = Math.max(1, Math.round(h * ratio));
+  const scaleX = w / sw;
+  const scaleY = h / sh;
+
+  const ctx = getReusableContext(sw, sh);
 
   if (!ctx) {
     return { width: w, height: h };
   }
 
-  ctx.drawImage(img, 0, 0);
+  ctx.drawImage(img, 0, 0, sw, sh);
 
-  const imageData = ctx.getImageData(0, 0, w, h);
+  const imageData = ctx.getImageData(0, 0, sw, sh);
   const data = imageData.data;
 
   const thresh = contrastThreshold;
@@ -113,8 +119,8 @@ export function measureWithContentDetection(
   const bgG = 255;
   const bgB = 255;
 
-  let minX = w;
-  let minY = h;
+  let minX = sw;
+  let minY = sh;
   let maxX = 0;
   let maxY = 0;
 
@@ -125,9 +131,9 @@ export function measureWithContentDetection(
   let filledPixels = 0;
   let totalWeightedOpacity = 0;
 
-  for (let y = 0; y < h; y++) {
-    const rowOffset = (y * w) << 2;
-    for (let x = 0; x < w; x++) {
+  for (let y = 0; y < sh; y++) {
+    const rowOffset = (y * sw) << 2;
+    for (let x = 0; x < sw; x++) {
       const i = rowOffset + (x << 2);
 
       const a = data[i + 3]!;
@@ -158,7 +164,7 @@ export function measureWithContentDetection(
 
       const distSq = dr * dr + dg * dg + db * db;
       const aScaled = a * INV_255;
-      const weight = distSq ** 0.25 * aScaled;
+      const weight = Math.sqrt(Math.sqrt(distSq)) * aScaled;
 
       totalWeight += weight;
       weightedX += (x + 0.5) * weight;
@@ -184,11 +190,13 @@ export function measureWithContentDetection(
     };
   }
 
+  const cbX = Math.floor(minX * scaleX);
+  const cbY = Math.floor(minY * scaleY);
   const contentBox: BoundingBox = {
-    x: minX,
-    y: minY,
-    width: maxX - minX + 1,
-    height: maxY - minY + 1,
+    x: cbX,
+    y: cbY,
+    width: Math.min(Math.ceil((maxX + 1) * scaleX), w) - cbX,
+    height: Math.min(Math.ceil((maxY + 1) * scaleY), h) - cbY,
   };
 
   let visualCenter: VisualCenter;
@@ -198,8 +206,8 @@ export function measureWithContentDetection(
     const centerY = contentBox.y + contentBox.height / 2;
     visualCenter = { x: centerX, y: centerY, offsetX: 0, offsetY: 0 };
   } else {
-    const globalCenterX = weightedX / totalWeight;
-    const globalCenterY = weightedY / totalWeight;
+    const globalCenterX = (weightedX / totalWeight) * scaleX;
+    const globalCenterY = (weightedY / totalWeight) * scaleY;
 
     const localCenterX = globalCenterX - contentBox.x;
     const localCenterY = globalCenterY - contentBox.y;
@@ -223,11 +231,11 @@ export function measureWithContentDetection(
   };
 
   if (includeDensity) {
-    const totalPixels = contentBox.width * contentBox.height;
-    if (totalPixels === 0) {
+    const scanArea = (maxX - minX + 1) * (maxY - minY + 1);
+    if (scanArea === 0) {
       result.pixelDensity = 0.5;
     } else {
-      const coverageRatio = filledPixels / totalPixels;
+      const coverageRatio = filledPixels / scanArea;
       const averageOpacity =
         filledPixels > 0 ? totalWeightedOpacity / filledPixels : 0;
       result.pixelDensity = coverageRatio * averageOpacity;
