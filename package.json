@@ -45,6 +45,7 @@
   "devDependencies": {
     "@chromatic-com/storybook": "^3",
     "@happy-dom/global-registrator": "^16",
+    "@napi-rs/canvas": "^0.1.90",
     "@storybook/addon-essentials": "^8",
     "@storybook/addon-interactions": "^8",
     "@storybook/addon-links": "^8",
@@ -56,8 +57,6 @@
     "@types/bun": "latest",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "jstat": "^1.9.6",
-    "mitata": "^1.0.34",
     "react": "^18",
     "react-dom": "^18",
     "storybook": "^8",

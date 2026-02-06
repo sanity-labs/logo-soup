@@ -22,7 +22,6 @@ jobs:
     needs: test
     permissions:
       pull-requests: write
-      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,7 +30,7 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - name: Benchmark (head)
-        run: BENCH_SAMPLES_PATH=head-samples.json bun run bench
+        run: bun run bench
         env:
           NODE_ENV: development
 
@@ -39,14 +38,14 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           git checkout ${{ github.event.pull_request.base.sha }} -- src/
-          BENCH_SAMPLES_PATH=/tmp/base-samples.json bun run bench
+          BENCH_OUT_DIR=/tmp/baseline bun run bench
           git checkout ${{ github.sha }} -- src/
         env:
           NODE_ENV: development
 
       - name: Compare against main
         if: github.event_name == 'pull_request'
-        run: bun tests/bench/compare.ts /tmp/base-samples.json head-samples.json "$GITHUB_HEAD_REF"
+        run: bun tests/bench/compare.ts /tmp/baseline/benchmark-samples.json tmp/benchmark-samples.json "$GITHUB_HEAD_REF"
         continue-on-error: true
         env:
           NODE_ENV: development
@@ -54,34 +53,17 @@ jobs:
       - name: Post results
         if: always()
         run: |
-          sleep 2
-          pr_qs=""
-          if [ -n "$PR_NUMBER" ]; then
-            pr_qs="?pr=$PR_NUMBER"
-          fi
-          job_url=$(gh run view "$GITHUB_RUN_ID" --json jobs --jq "
-            .jobs[] | select(.name == \"bench\")
-            | (.url + \"${pr_qs}\" + (.steps[] | select(.name == \"Benchmark (head)\")
-              | \"#step:\(.number):1\"))")
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
           : > /tmp/summary.md
-          if [ -f benchmark-comparison.md ]; then
-            cat benchmark-comparison.md >> /tmp/summary.md
+          [ -f tmp/benchmark-comparison.md ] && cat tmp/benchmark-comparison.md >> /tmp/summary.md && echo "" >> /tmp/summary.md
+          if [ -f tmp/benchmark-report.md ]; then
+            cat tmp/benchmark-report.md >> /tmp/summary.md
             echo "" >> /tmp/summary.md
-          fi
-          if [ -f benchmark-report.md ]; then
-            head -1 benchmark-report.md >> /tmp/summary.md
-            if [ -n "$job_url" ]; then
-              echo "" >> /tmp/summary.md
-              echo "Full benchmark output in the [CI job logs](${job_url})." >> /tmp/summary.md
-            fi
-            tail -n +2 benchmark-report.md >> /tmp/summary.md
+            echo "Full benchmark output in the [CI job logs](${RUN_URL})." >> /tmp/summary.md
           fi
 
           [ -s /tmp/summary.md ] && cat /tmp/summary.md >> "$GITHUB_STEP_SUMMARY"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
 
       - name: Comment on PR
         if: github.event_name == 'pull_request' && always()
@@ -98,8 +80,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
-          path: |
-            benchmark-report.md
-            benchmark-comparison.md
-            head-samples.json
+          path: tmp/
           retention-days: 30

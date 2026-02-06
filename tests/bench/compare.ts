@@ -1,5 +1,6 @@
-import { jStat } from "jstat";
-import { welchTTest, fmtNs, fmtP } from "./welch";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { fmtNs, fmtP, mean, welchTTest } from "./welch";
 
 const [baseFile, headFile, branchName] = process.argv.slice(2);
 const headLabel = branchName || "HEAD";
@@ -33,8 +34,8 @@ for (const name of Object.keys(base)) {
   const headSamples = head[name];
   if (!baseSamples || !headSamples) continue;
 
-  const baseMean = jStat.mean(baseSamples);
-  const headMean = jStat.mean(headSamples);
+  const baseMean = mean(baseSamples);
+  const headMean = mean(headSamples);
   const pctChange = ((headMean - baseMean) / baseMean) * 100;
   const result = welchTTest(headSamples, baseSamples);
 
@@ -125,24 +126,14 @@ if (regressions.length > 0) {
 md.push("");
 const mdContent = md.join("\n");
 
-const outPath = process.env.BENCH_COMPARE_PATH ?? "benchmark-comparison.md";
+const outDir = process.env.BENCH_OUT_DIR ?? "tmp";
+mkdirSync(outDir, { recursive: true });
+const outPath = join(outDir, "benchmark-comparison.md");
 try {
   await Bun.write(outPath, mdContent);
   console.log(`  Wrote ${outPath}`);
 } catch {
   // non-critical
-}
-
-const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-if (summaryPath) {
-  try {
-    const existing = await Bun.file(summaryPath)
-      .text()
-      .catch(() => "");
-    await Bun.write(summaryPath, existing + "\n" + mdContent);
-  } catch {
-    // non-critical
-  }
 }
 
 process.exit(regressions.length > 0 ? 1 : 0);
