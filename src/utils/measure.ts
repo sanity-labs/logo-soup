@@ -1,15 +1,13 @@
 import type { BoundingBox, MeasurementResult, VisualCenter } from "../types";
 
-export function cropToDataUrl(
+function drawCropped(
   img: HTMLImageElement,
   contentBox: BoundingBox,
-): string {
+): HTMLCanvasElement | null {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
 
-  if (!ctx) {
-    return img.src;
-  }
+  if (!ctx) return null;
 
   canvas.width = contentBox.width;
   canvas.height = contentBox.height;
@@ -26,7 +24,33 @@ export function cropToDataUrl(
     contentBox.height,
   );
 
+  return canvas;
+}
+
+export function cropToDataUrl(
+  img: HTMLImageElement,
+  contentBox: BoundingBox,
+): string {
+  const canvas = drawCropped(img, contentBox);
+  if (!canvas) return img.src;
   return canvas.toDataURL("image/png");
+}
+
+export function cropToBlobUrl(
+  img: HTMLImageElement,
+  contentBox: BoundingBox,
+): Promise<string> {
+  const canvas = drawCropped(img, contentBox);
+  if (!canvas) return Promise.resolve(img.src);
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        resolve(img.src);
+        return;
+      }
+      resolve(URL.createObjectURL(blob));
+    });
+  });
 }
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
