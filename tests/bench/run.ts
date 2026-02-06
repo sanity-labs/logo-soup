@@ -240,7 +240,7 @@ for (const [name, samples] of Object.entries(benchSamples)) {
 
 md.push("");
 
-if (!QUICK) {
+{
   const medianMeasurement = realMeasurements[allLogos.indexOf(medianLogo)]!;
 
   const benchReNormalize20 = () => {
@@ -342,8 +342,6 @@ if (!QUICK) {
     "A/B columns match the order in the test name. Sig: `*` p<0.05, `**` p<0.01, `***` p<0.001.",
     "",
   );
-} else {
-  console.log("\n  Skipping AB comparisons in quick mode.");
 }
 
 const outDir = process.env.BENCH_OUT_DIR ?? "tmp";
