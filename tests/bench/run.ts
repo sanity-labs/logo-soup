@@ -15,7 +15,7 @@ import {
 import type { LogoSource, MeasurementResult } from "../../src/types";
 import { getVisualCenterTransform } from "../../src/utils/getVisualCenterTransform";
 import {
-  detectContentBoundingBox,
+  cropToDataUrl,
   measureImage,
   measureWithContentDetection,
 } from "../../src/utils/measure";
@@ -81,12 +81,6 @@ const medianLogo = byPixels[Math.floor(byPixels.length / 2)]!;
 console.log(
   `Rasterized ${allLogos.length} logos, median: ${medianLogo.name} (${medianLogo.width}x${medianLogo.height})`,
 );
-
-const medianBuf = Buffer.from(
-  await Bun.file(join(LOGOS_DIR, `${medianLogo.name}.svg`)).arrayBuffer(),
-);
-const bboxSmall = await loadSvgAtWidth(medianBuf, 64);
-const bboxLarge = await loadSvgAtWidth(medianBuf, 1200);
 
 const sources: LogoSource[] = allLogos.map((l) => ({
   src: `static/logos/${l.name}.svg`,
@@ -207,15 +201,17 @@ interface ABComparison {
   b: { label: string; fn: () => void };
 }
 
+const medianMeasurement = realMeasurements[allLogos.indexOf(medianLogo)]!;
+
 const abComparisons: ABComparison[] = [
   {
-    name: `Density: ON vs OFF (${medianLogo.width}x${medianLogo.height})`,
+    name: "densityAware: true vs false",
     a: {
-      label: "density ON",
+      label: "true",
       fn: benchMeasure,
     },
     b: {
-      label: "density OFF",
+      label: "false",
       fn: () =>
         measureWithContentDetection(
           medianLogo.img,
@@ -225,7 +221,7 @@ const abComparisons: ABComparison[] = [
     },
   },
   {
-    name: "Alignment: visual-center-y vs bounds (20 logos)",
+    name: "alignBy: visual-center-y vs bounds",
     a: { label: "visual-center-y", fn: benchGetVCT20 },
     b: {
       label: "bounds",
@@ -236,22 +232,19 @@ const abComparisons: ABComparison[] = [
     },
   },
   {
-    name: `Bbox scaling: ${bboxLarge.width}x${bboxLarge.height} vs ${bboxSmall.width}x${bboxSmall.height}`,
+    name: "cropToContent: true vs false",
     a: {
-      label: `${bboxLarge.width}x${bboxLarge.height}`,
-      fn: () =>
-        detectContentBoundingBox(
-          bboxLarge.img as unknown as HTMLImageElement,
-          DEFAULT_CONTRAST_THRESHOLD,
-        ),
+      label: "true",
+      fn: () => {
+        if (medianMeasurement.contentBox)
+          blackhole(
+            cropToDataUrl(medianLogo.img, medianMeasurement.contentBox),
+          );
+      },
     },
     b: {
-      label: `${bboxSmall.width}x${bboxSmall.height}`,
-      fn: () =>
-        detectContentBoundingBox(
-          bboxSmall.img as unknown as HTMLImageElement,
-          DEFAULT_CONTRAST_THRESHOLD,
-        ),
+      label: "false (noop)",
+      fn: () => {},
     },
   },
 ];
