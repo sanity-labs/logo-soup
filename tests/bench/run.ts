@@ -189,10 +189,10 @@ const benchMount20Baseline = () => {
 };
 
 const keyBenchmarks: Record<string, () => void> = {
-  [`measure (${medianLogo.width}x${medianLogo.height})`]: benchMeasure,
-  "getVCT x 20 (per render)": benchGetVCT20,
-  "mount 20 logos (no pixel scanning)": benchMount20Baseline,
-  "mount 20 logos (default settings)": benchMount20,
+  "content detection (1 logo)": benchMeasure,
+  "render pass (20 logos)": benchGetVCT20,
+  "mount 20 logos (no detection)": benchMount20Baseline,
+  "mount 20 logos (defaults)": benchMount20,
 };
 
 interface ABComparison {
