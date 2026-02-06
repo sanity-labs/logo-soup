@@ -14,7 +14,7 @@ import type {
   UseLogoSoupResult,
 } from "../types";
 import {
-  cropToDataUrl,
+  cropToBlobUrl,
   loadImage,
   measureWithContentDetection,
 } from "../utils/measure";
@@ -85,6 +85,7 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     }
 
     let cancelled = false;
+    const blobUrls: string[] = [];
     dispatch({ type: "loading" });
 
     const sources: LogoSource[] = stableLogos.map(normalizeSource);
@@ -112,7 +113,13 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
         );
 
         if (cropToContent && measurement.contentBox) {
-          normalized.croppedSrc = cropToDataUrl(img, measurement.contentBox);
+          const url = await cropToBlobUrl(img, measurement.contentBox);
+          if (cancelled) {
+            URL.revokeObjectURL(url);
+            throw new Error("cancelled");
+          }
+          blobUrls.push(url);
+          normalized.croppedSrc = url;
         }
 
         return normalized;
@@ -143,6 +150,9 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
 
     return () => {
       cancelled = true;
+      for (const url of blobUrls) {
+        URL.revokeObjectURL(url);
+      }
     };
   }, [
     stableLogos,
