@@ -64,14 +64,21 @@ const svgFiles = readdirSync(LOGOS_DIR)
   .filter((f) => f.endsWith(".svg"))
   .sort();
 
-console.log(`Loading ${svgFiles.length} real SVGs from static/logos/…`);
+const QUICK = !!(process.env.BENCH_QUICK || process.env.CI);
 
-const allLogos: RenderedLogo[] = [];
-for (const file of svgFiles) {
-  const buf = Buffer.from(await Bun.file(join(LOGOS_DIR, file)).arrayBuffer());
-  const { img, width, height } = await loadSvgAtWidth(buf, 400);
-  allLogos.push({ name: file.replace(/\.svg$/, ""), img, width, height });
-}
+console.log(
+  `Loading ${svgFiles.length} real SVGs from static/logos/…${QUICK ? " (quick mode)" : ""}`,
+);
+
+const allLogos: RenderedLogo[] = await Promise.all(
+  svgFiles.map(async (file) => {
+    const buf = Buffer.from(
+      await Bun.file(join(LOGOS_DIR, file)).arrayBuffer(),
+    );
+    const { img, width, height } = await loadSvgAtWidth(buf, 400);
+    return { name: file.replace(/\.svg$/, ""), img, width, height };
+  }),
+);
 
 const byPixels = [...allLogos].sort(
   (a, b) => a.width * a.height - b.width * b.height,
@@ -104,10 +111,10 @@ const normalized20 = Array.from({ length: 20 }, (_, i) => {
 
 const logos20 = allLogos.slice(0, 20);
 
-const TIME_BUDGET_MS = 2_000;
-const MIN_SAMPLES = 30;
+const TIME_BUDGET_MS = QUICK ? 800 : 2_000;
+const MIN_SAMPLES = QUICK ? 20 : 30;
 const MAX_SAMPLES = 2_000;
-const WARMUP_MS = 200;
+const WARMUP_MS = QUICK ? 80 : 200;
 
 function collectSamples(fn: () => void): number[] {
   const warmupEnd = Bun.nanoseconds() + WARMUP_MS * 1e6;
@@ -293,12 +300,6 @@ for (const [name, fn] of Object.entries(keyBenchmarks)) {
   );
 }
 
-console.log();
-console.log("─".repeat(72));
-console.log("  FEATURE COMPARISONS (Welch's t-test, two-tailed)");
-console.log("  Legend: * p<0.05  ** p<0.01  *** p<0.001");
-console.log("─".repeat(72));
-
 interface ABResult {
   name: string;
   aLabel: string;
@@ -311,32 +312,42 @@ interface ABResult {
 
 const abResults: ABResult[] = [];
 
-for (const comp of abComparisons) {
-  const samplesA = collectSamples(comp.a.fn);
-  const samplesB = collectSamples(comp.b.fn);
-  const result = welchTTest(samplesA, samplesB);
-  const sA = stats(samplesA);
-  const sB = stats(samplesB);
-  const pctChange = sB.mean !== 0 ? ((sA.mean - sB.mean) / sB.mean) * 100 : 0;
-
-  const sig = result.significant ? `YES ${result.marker}` : "NO";
-  const sign = pctChange > 0 ? "+" : "";
-  console.log(`  > ${comp.name}`);
-  console.log(
-    `    ${comp.a.label}: ${fmtNs(sA.mean)}  vs  ${comp.b.label}: ${fmtNs(sB.mean)}  (${sign}${pctChange.toFixed(1)}%)`,
-  );
-  console.log(`    p=${fmtP(result.p)}  significant=${sig}`);
+if (!QUICK) {
   console.log();
+  console.log("─".repeat(72));
+  console.log("  FEATURE COMPARISONS (Welch's t-test, two-tailed)");
+  console.log("  Legend: * p<0.05  ** p<0.01  *** p<0.001");
+  console.log("─".repeat(72));
 
-  abResults.push({
-    name: comp.name,
-    aLabel: comp.a.label,
-    bLabel: comp.b.label,
-    aMean: fmtNs(sA.mean),
-    bMean: fmtNs(sB.mean),
-    pctChange,
-    result,
-  });
+  for (const comp of abComparisons) {
+    const samplesA = collectSamples(comp.a.fn);
+    const samplesB = collectSamples(comp.b.fn);
+    const result = welchTTest(samplesA, samplesB);
+    const sA = stats(samplesA);
+    const sB = stats(samplesB);
+    const pctChange = sB.mean !== 0 ? ((sA.mean - sB.mean) / sB.mean) * 100 : 0;
+
+    const sig = result.significant ? `YES ${result.marker}` : "NO";
+    const sign = pctChange > 0 ? "+" : "";
+    console.log(`  > ${comp.name}`);
+    console.log(
+      `    ${comp.a.label}: ${fmtNs(sA.mean)}  vs  ${comp.b.label}: ${fmtNs(sB.mean)}  (${sign}${pctChange.toFixed(1)}%)`,
+    );
+    console.log(`    p=${fmtP(result.p)}  significant=${sig}`);
+    console.log();
+
+    abResults.push({
+      name: comp.name,
+      aLabel: comp.a.label,
+      bLabel: comp.b.label,
+      aMean: fmtNs(sA.mean),
+      bMean: fmtNs(sB.mean),
+      pctChange,
+      result,
+    });
+  }
+} else {
+  console.log("\n  Skipping AB comparisons in quick mode.");
 }
 
 const md: string[] = [
