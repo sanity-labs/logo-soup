@@ -188,6 +188,20 @@ const benchMount20Baseline = () => {
   }
 };
 
+const benchReNormalize20 = () => {
+  for (let i = 0; i < 20; i++) {
+    const idx = i % allLogos.length;
+    const logo = createNormalizedLogo(
+      sources[idx]!,
+      realMeasurements[idx]!,
+      DEFAULT_BASE_SIZE,
+      DEFAULT_SCALE_FACTOR,
+      DEFAULT_DENSITY_FACTOR,
+    );
+    blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
+  }
+};
+
 const keyBenchmarks: Record<string, () => void> = {
   "content detection (1 logo)": benchMeasure,
   "render pass (20 logos)": benchGetVCT20,
@@ -245,6 +259,17 @@ const abComparisons: ABComparison[] = [
     b: {
       label: "false (noop)",
       fn: () => {},
+    },
+  },
+  {
+    name: "layout update: full mount vs cached",
+    a: {
+      label: "full mount",
+      fn: benchMount20,
+    },
+    b: {
+      label: "cached re-normalize",
+      fn: benchReNormalize20,
     },
   },
 ];
