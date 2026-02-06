@@ -596,10 +596,16 @@ for (const [name, fn] of Object.entries(keyBenchmarks)) {
 
 // Markdown report for CI
 
+const runUrl = process.env.GITHUB_RUN_ID
+  ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+  : null;
+
 const md: string[] = [
   "# react-logo-soup Benchmark Report",
   "",
-  "> Full benchmark output is in the CI job logs. This summary covers statistical significance tests.",
+  runUrl
+    ? `> Full benchmark output in the [CI job logs](${runUrl}). This summary covers statistical significance tests.`
+    : "> This summary covers statistical significance tests.",
   "",
   `> Test fixtures: ${LOGO_DIMS.length} logo dimensions from real SVGs in static/logos/. ` +
     `${PVALUE_ITERS} samples per group, ${PVALUE_WARMUP} warmup iterations.`,
