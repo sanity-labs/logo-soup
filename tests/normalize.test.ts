@@ -1,10 +1,10 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
+import type { LogoSource, MeasurementResult } from "../src/types";
 import {
-  normalizeSource,
   calculateNormalizedDimensions,
   createNormalizedLogo,
-} from "../src/normalize";
-import type { MeasurementResult, LogoSource } from "../src/types";
+  normalizeSource,
+} from "../src/utils/normalize";
 
 describe("normalizeSource", () => {
   test("converts string to LogoSource", () => {

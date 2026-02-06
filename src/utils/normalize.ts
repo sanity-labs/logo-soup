@@ -1,5 +1,21 @@
 import type { LogoSource, MeasurementResult, NormalizedLogo } from "../types";
 
+export function logosEqual(
+  a: (string | LogoSource)[],
+  b: (string | LogoSource)[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const itemA = a[i];
+    const itemB = b[i];
+    if (itemA === undefined || itemB === undefined) return false;
+    const srcA = typeof itemA === "string" ? itemA : itemA.src;
+    const srcB = typeof itemB === "string" ? itemB : itemB.src;
+    if (srcA !== srcB) return false;
+  }
+  return true;
+}
+
 export function normalizeSource(source: string | LogoSource): LogoSource {
   if (typeof source === "string") {
     return { src: source, alt: "" };
