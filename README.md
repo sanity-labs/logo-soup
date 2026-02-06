@@ -26,13 +26,19 @@ import { LogoSoup } from "react-logo-soup";
 function LogoStrip() {
   return (
     <LogoSoup
-      logos={["/logos/acme.svg", "/logos/globex.svg", "/logos/initech.svg"]}
+      logos={[
+        { src: "/logos/acme.svg", alt: "Acme Corp" },
+        { src: "/logos/globex.svg", alt: "Globex" },
+        { src: "/logos/initech.svg", alt: "Initech" },
+      ]}
     />
   );
 }
 ```
 
 That's it! React Logo Soup will analyze each logo and normalize them to look visually balanced.
+
+Logos can be plain URL strings or objects with `alt` text. Use objects to provide accessible alt text for each logo. The alt text is passed directly to the underlying `<img>` tag.
 
 ## Options
 
@@ -125,7 +131,10 @@ import { useLogoSoup } from "react-logo-soup";
 
 function CustomGrid() {
   const { isLoading, normalizedLogos } = useLogoSoup({
-    logos: ["/logo1.svg", "/logo2.svg"],
+    logos: [
+      { src: "/logo1.svg", alt: "Logo 1" },
+      { src: "/logo2.svg", alt: "Logo 2" },
+    ],
   });
 
   if (isLoading) return <div>Loading...</div>;
@@ -136,6 +145,7 @@ function CustomGrid() {
         <img
           key={logo.src}
           src={logo.src}
+          alt={logo.alt}
           width={logo.normalizedWidth}
           height={logo.normalizedHeight}
         />
@@ -173,7 +183,7 @@ function CustomGrid() {
 
 ## Custom Image Component
 
-Use with Next.js Image or any custom component:
+Use `renderImage` to render logos with Next.js Image, add extra attributes, or fully control the `<img>` output. The callback receives all standard `<img>` attributes (`src`, `alt`, `width`, `height`, `style`):
 
 ```tsx
 import Image from "next/image";
@@ -188,6 +198,15 @@ import Image from "next/image";
       height={props.height}
     />
   )}
+/>;
+```
+
+You can also use it to add attributes like `loading` or `className`:
+
+```tsx
+<LogoSoup
+  logos={logos}
+  renderImage={(props) => <img {...props} loading="lazy" decoding="async" />}
 />;
 ```
 
