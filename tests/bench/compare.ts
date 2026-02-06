@@ -93,7 +93,7 @@ console.log("─".repeat(80));
 // Markdown report
 
 const md: string[] = [
-  `# Benchmark Comparison: main vs ${headLabel}`,
+  `## Benchmark Comparison: main vs ${headLabel}`,
   "",
   `Threshold: ${THRESHOLD_PCT}%+ change, >${THRESHOLD_ABS_NS / 1_000}us absolute delta, and statistically significant (p<0.05).`,
   "",

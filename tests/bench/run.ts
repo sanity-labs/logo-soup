@@ -572,12 +572,12 @@ for (const [name, fn] of Object.entries(keyBenchmarks)) {
 // Markdown report for CI
 
 const md: string[] = [
-  "# react-logo-soup Benchmark Report",
+  "## react-logo-soup Benchmark Report",
   "",
   `Test fixtures: ${LOGO_DIMS.length} logo dimensions from real SVGs in static/logos/. ` +
     `${PVALUE_ITERS} samples per group, ${PVALUE_WARMUP} warmup iterations.`,
   "",
-  "## Feature Comparisons (Welch's t-test)",
+  "### Feature Comparisons (Welch's t-test)",
   "",
   "| Test | A | B | Delta | Sig |",
   "|:-----|--:|--:|------:|:----|",
