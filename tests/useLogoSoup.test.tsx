@@ -1,17 +1,6 @@
-import { describe, test, expect, mock } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import { renderHook, waitFor } from "@testing-library/react";
 import { useLogoSoup } from "../src/hooks/useLogoSoup";
-
-const createMockImage = (width: number, height: number) => {
-  return {
-    naturalWidth: width,
-    naturalHeight: height,
-    crossOrigin: "",
-    src: "",
-    onload: null as (() => void) | null,
-    onerror: null as (() => void) | null,
-  };
-};
 
 const originalImage = globalThis.Image;
 
@@ -63,9 +52,9 @@ describe("useLogoSoup", () => {
       onerror: (() => void) | null = null;
 
       constructor() {
-        setTimeout(() => {
+        queueMicrotask(() => {
           if (this.onload) this.onload();
-        }, 0);
+        });
       }
     } as unknown as typeof Image;
 
@@ -108,9 +97,9 @@ describe("useLogoSoup", () => {
       onerror: (() => void) | null = null;
 
       constructor() {
-        setTimeout(() => {
+        queueMicrotask(() => {
           if (this.onerror) this.onerror();
-        }, 0);
+        });
       }
     } as unknown as typeof Image;
 
@@ -140,9 +129,9 @@ describe("useLogoSoup", () => {
       onerror: (() => void) | null = null;
 
       constructor() {
-        setTimeout(() => {
+        queueMicrotask(() => {
           if (this.onload) this.onload();
-        }, 0);
+        });
       }
     } as unknown as typeof Image;
 
@@ -171,9 +160,9 @@ describe("useLogoSoup", () => {
       onerror: (() => void) | null = null;
 
       constructor() {
-        setTimeout(() => {
+        queueMicrotask(() => {
           if (this.onload) this.onload();
-        }, 0);
+        });
       }
     } as unknown as typeof Image;
 
@@ -204,9 +193,9 @@ describe("useLogoSoup", () => {
       onerror: (() => void) | null = null;
 
       constructor() {
-        setTimeout(() => {
+        queueMicrotask(() => {
           if (this.onload) this.onload();
-        }, 0);
+        });
       }
     } as unknown as typeof Image;
 
@@ -229,6 +218,7 @@ describe("useLogoSoup", () => {
     rerender({ baseSize: 96 });
 
     await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
       expect(result.current.normalizedLogos[0]?.normalizedWidth).not.toBe(
         firstWidth,
       );

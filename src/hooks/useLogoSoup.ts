@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import {
   DEFAULT_BASE_SIZE,
   DEFAULT_CONTRAST_THRESHOLD,
@@ -16,7 +16,11 @@ import {
   loadImage,
   measureWithContentDetection,
 } from "../utils/measure";
-import { createNormalizedLogo, normalizeSource } from "../utils/normalize";
+import {
+  createNormalizedLogo,
+  logosEqual,
+  normalizeSource,
+} from "../utils/normalize";
 
 type State = {
   isLoading: boolean;
@@ -66,8 +70,14 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
 
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
+  const logosRef = useRef(logos);
+  if (!logosEqual(logosRef.current, logos)) {
+    logosRef.current = logos;
+  }
+  const stableLogos = logosRef.current;
+
   useEffect(() => {
-    if (logos.length === 0) {
+    if (stableLogos.length === 0) {
       dispatch({ type: "empty" });
       return;
     }
@@ -75,7 +85,7 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     let cancelled = false;
     dispatch({ type: "loading" });
 
-    const sources: LogoSource[] = logos.map(normalizeSource);
+    const sources: LogoSource[] = stableLogos.map(normalizeSource);
 
     Promise.allSettled(
       sources.map(async (source) => {
@@ -108,12 +118,23 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     ).then((settled) => {
       if (cancelled) return;
 
-      const results = settled
-        .filter(
-          (r): r is PromiseFulfilledResult<NormalizedLogo> =>
-            r.status === "fulfilled",
-        )
-        .map((r) => r.value);
+      const results: NormalizedLogo[] = [];
+      let firstError: Error | undefined;
+      for (const r of settled) {
+        if (r.status === "fulfilled") {
+          results.push(r.value);
+        } else if (!firstError) {
+          firstError =
+            r.reason instanceof Error
+              ? r.reason
+              : new Error("Failed to load logo");
+        }
+      }
+
+      if (results.length === 0 && firstError) {
+        dispatch({ type: "error", error: firstError });
+        return;
+      }
 
       dispatch({ type: "success", normalizedLogos: results });
     });
@@ -122,7 +143,7 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
       cancelled = true;
     };
   }, [
-    logos,
+    stableLogos,
     baseSize,
     scaleFactor,
     contrastThreshold,

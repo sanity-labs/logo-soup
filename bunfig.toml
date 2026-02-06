@@ -1,2 +1,5 @@
 [test]
 preload = ["./tests/setup.ts"]
+
+[test.env]
+NODE_ENV = "development"
