@@ -97,7 +97,7 @@ Imagine you have two logos:
 
 ### `alignBy`
 
-How to align logos. Default is `"bounds"`.
+How to align logos. Default is `"visual-center-y"`.
 
 - `"bounds"` — Align by geometric center (bounding box)
 - `"visual-center"` — Align by visual weight center (accounts for asymmetric logos)
