@@ -70,13 +70,12 @@ jobs:
             echo "" >> /tmp/summary.md
           fi
           if [ -f benchmark-report.md ]; then
+            head -1 benchmark-report.md >> /tmp/summary.md
             if [ -n "$job_url" ]; then
-              sed "1a\\
-\\
-Full benchmark output in the [CI job logs](${job_url})." benchmark-report.md >> /tmp/summary.md
-            else
-              cat benchmark-report.md >> /tmp/summary.md
+              echo "" >> /tmp/summary.md
+              echo "Full benchmark output in the [CI job logs](${job_url})." >> /tmp/summary.md
             fi
+            tail -n +2 benchmark-report.md >> /tmp/summary.md
           fi
 
           [ -s /tmp/summary.md ] && cat /tmp/summary.md >> "$GITHUB_STEP_SUMMARY"
