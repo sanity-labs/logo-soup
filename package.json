@@ -22,6 +22,7 @@
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist",
     "prepublishOnly": "bun run build",
     "test": "bun test",
+    "bench": "bun tests/bench/run.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
@@ -43,6 +44,8 @@
   "license": "MIT",
   "devDependencies": {
     "@chromatic-com/storybook": "^3",
+    "@happy-dom/global-registrator": "^16",
+    "@napi-rs/canvas": "^0.1.90",
     "@storybook/addon-essentials": "^8",
     "@storybook/addon-interactions": "^8",
     "@storybook/addon-links": "^8",
@@ -50,7 +53,6 @@
     "@storybook/react": "^8",
     "@storybook/react-vite": "^8",
     "@storybook/test": "^8",
-    "@happy-dom/global-registrator": "^16",
     "@testing-library/react": "^16",
     "@types/bun": "latest",
     "@types/react": "^18",
