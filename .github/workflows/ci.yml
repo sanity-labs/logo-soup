@@ -61,6 +61,25 @@ jobs:
             cat benchmark-report.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && always()
+        run: |
+          body=""
+          if [ -f benchmark-comparison.md ]; then
+            body="$(cat benchmark-comparison.md)"
+          fi
+          if [ -f benchmark-report.md ]; then
+            body="${body}
+
+          $(cat benchmark-report.md)"
+          fi
+          if [ -n "$body" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body "$body" --edit-last || \
+            gh pr comment ${{ github.event.pull_request.number }} --body "$body"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
