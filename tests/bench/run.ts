@@ -149,13 +149,27 @@ function worstCaseRun(img: HTMLImageElement, count: number) {
   }
 }
 
-const ITERS = 2000;
-const WARMUP = 200;
+const TIME_BUDGET_MS = 2_000;
+const MIN_SAMPLES = 30;
+const MAX_SAMPLES = 2_000;
+const WARMUP_MS = 200;
 
 function collectSamples(fn: () => void): number[] {
-  for (let i = 0; i < WARMUP; i++) fn();
-  const samples: number[] = new Array(ITERS);
-  for (let i = 0; i < ITERS; i++) {
+  const warmupEnd = Bun.nanoseconds() + WARMUP_MS * 1e6;
+  while (Bun.nanoseconds() < warmupEnd) fn();
+
+  let calibrate = 0;
+  const calStart = Bun.nanoseconds();
+  for (let i = 0; i < 5; i++) fn();
+  calibrate = (Bun.nanoseconds() - calStart) / 5;
+
+  const iters = Math.min(
+    MAX_SAMPLES,
+    Math.max(MIN_SAMPLES, Math.floor((TIME_BUDGET_MS * 1e6) / calibrate)),
+  );
+
+  const samples: number[] = new Array(iters);
+  for (let i = 0; i < iters; i++) {
     const s = Bun.nanoseconds();
     fn();
     samples[i] = Bun.nanoseconds() - s;
@@ -298,7 +312,7 @@ console.log();
 console.log("─".repeat(72));
 console.log("  KEY BENCHMARKS");
 console.log(
-  `  ${allLogos.length} real logos, ${ITERS} samples, ${WARMUP} warmup`,
+  `  ${allLogos.length} real logos, ${TIME_BUDGET_MS}ms budget/bench, ${MIN_SAMPLES}-${MAX_SAMPLES} samples`,
 );
 console.log("─".repeat(72));
 
@@ -309,7 +323,7 @@ for (const [name, fn] of Object.entries(keyBenchmarks)) {
   benchSamples[name] = samples;
   const s = stats(samples);
   console.log(
-    `  ${name.padEnd(38)} ${fmtNs(s.mean).padStart(10)} ± ${fmtNs(s.stddev).padStart(10)}  (min ${fmtNs(s.min)}, max ${fmtNs(s.max)})`,
+    `  ${name.padEnd(38)} ${fmtNs(s.mean).padStart(10)} ± ${fmtNs(s.stddev).padStart(10)}  (n=${String(samples.length).padStart(4)}, min ${fmtNs(s.min)}, max ${fmtNs(s.max)})`,
   );
 }
 
@@ -363,7 +377,7 @@ const md: string[] = [
   "## react-logo-soup Benchmark Report",
   "",
   `Test fixtures: ${allLogos.length} real SVGs from static/logos/. ` +
-    `${ITERS} samples per group, ${WARMUP} warmup iterations.`,
+    `${TIME_BUDGET_MS}ms budget per bench, ${MIN_SAMPLES}-${MAX_SAMPLES} samples.`,
   "",
   "### Feature Comparisons (Welch's t-test)",
   "",
