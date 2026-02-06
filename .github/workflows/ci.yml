@@ -54,8 +54,15 @@ jobs:
       - name: Post results
         if: always()
         run: |
-          job_url=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
-            --jq '.jobs[] | select(.name == "bench") | .html_url + "#step:" + (.steps[] | select(.name == "Benchmark (head)") | .number | tostring) + ":1"')
+          sleep 2
+          pr_qs=""
+          if [ -n "$PR_NUMBER" ]; then
+            pr_qs="?pr=$PR_NUMBER"
+          fi
+          job_url=$(gh run view "$GITHUB_RUN_ID" --json jobs --jq "
+            .jobs[] | select(.name == \"bench\")
+            | (.url + \"${pr_qs}\" + (.steps[] | select(.name == \"Benchmark (head)\")
+              | \"#step:\(.number):1\"))")
 
           : > /tmp/summary.md
           if [ -f benchmark-comparison.md ]; then
@@ -75,6 +82,7 @@ jobs:
           [ -s /tmp/summary.md ] && cat /tmp/summary.md >> "$GITHUB_STEP_SUMMARY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
 
       - name: Comment on PR
         if: github.event_name == 'pull_request' && always()
