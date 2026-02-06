@@ -1,47 +1,74 @@
 import type { BoundingBox, MeasurementResult, VisualCenter } from "../types";
 
+function createReusableCanvas(
+  options?: CanvasRenderingContext2DSettings,
+): (w: number, h: number) => CanvasRenderingContext2D | null {
+  let canvas: HTMLCanvasElement | null = null;
+  let ctx: CanvasRenderingContext2D | null = null;
+  let prevW = 0;
+  let prevH = 0;
+
+  return (w: number, h: number) => {
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      ctx = canvas.getContext("2d", options);
+    }
+    if (!ctx) return null;
+    if (prevW !== w || prevH !== h) {
+      canvas.width = w;
+      canvas.height = h;
+      prevW = w;
+      prevH = h;
+    } else {
+      ctx.clearRect(0, 0, w, h);
+    }
+    return ctx;
+  };
+}
+
+const getCropContext = createReusableCanvas();
+const getMeasureContext = createReusableCanvas({ willReadFrequently: true });
+
 function drawCropped(
+  ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
-  contentBox: BoundingBox,
-): HTMLCanvasElement | null {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-
-  if (!ctx) return null;
-
-  canvas.width = contentBox.width;
-  canvas.height = contentBox.height;
-
+  box: BoundingBox,
+): void {
   ctx.drawImage(
     img,
-    contentBox.x,
-    contentBox.y,
-    contentBox.width,
-    contentBox.height,
+    box.x,
+    box.y,
+    box.width,
+    box.height,
     0,
     0,
-    contentBox.width,
-    contentBox.height,
+    box.width,
+    box.height,
   );
-
-  return canvas;
 }
 
 export function cropToDataUrl(
   img: HTMLImageElement,
   contentBox: BoundingBox,
 ): string {
-  const canvas = drawCropped(img, contentBox);
-  if (!canvas) return img.src;
-  return canvas.toDataURL("image/png");
+  const ctx = getCropContext(contentBox.width, contentBox.height);
+  if (!ctx) return img.src;
+  drawCropped(ctx, img, contentBox);
+  return ctx.canvas.toDataURL("image/png");
 }
 
 export function cropToBlobUrl(
   img: HTMLImageElement,
   contentBox: BoundingBox,
 ): Promise<string> {
-  const canvas = drawCropped(img, contentBox);
-  if (!canvas) return Promise.resolve(img.src);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return Promise.resolve(img.src);
+
+  canvas.width = contentBox.width;
+  canvas.height = contentBox.height;
+  drawCropped(ctx, img, contentBox);
+
   return new Promise((resolve) => {
     canvas.toBlob((blob) => {
       if (!blob) {
@@ -70,23 +97,7 @@ export function measureImage(img: HTMLImageElement): MeasurementResult {
   };
 }
 
-let _canvas: HTMLCanvasElement | null = null;
-let _ctx: CanvasRenderingContext2D | null = null;
-
-function getReusableContext(
-  w: number,
-  h: number,
-): CanvasRenderingContext2D | null {
-  if (!_canvas) {
-    _canvas = document.createElement("canvas");
-    _ctx = _canvas.getContext("2d", { willReadFrequently: true });
-  }
-  if (!_ctx) return null;
-  _canvas.width = w;
-  _canvas.height = h;
-  return _ctx;
-}
-
+const PIXEL_BUDGET = 2_048;
 const INV_255 = 1 / 255;
 
 export function measureWithContentDetection(
@@ -97,13 +108,15 @@ export function measureWithContentDetection(
   const w = img.naturalWidth;
   const h = img.naturalHeight;
 
-  const ratio = w * h > 10_000 ? Math.sqrt(10_000 / (w * h)) : 1;
+  const totalPixels = w * h;
+  const ratio =
+    totalPixels > PIXEL_BUDGET ? Math.sqrt(PIXEL_BUDGET / totalPixels) : 1;
   const sw = Math.max(1, Math.round(w * ratio));
   const sh = Math.max(1, Math.round(h * ratio));
   const scaleX = w / sw;
   const scaleY = h / sh;
 
-  const ctx = getReusableContext(sw, sh);
+  const ctx = getMeasureContext(sw, sh);
 
   if (!ctx) {
     return { width: w, height: h };
@@ -112,12 +125,9 @@ export function measureWithContentDetection(
   ctx.drawImage(img, 0, 0, sw, sh);
 
   const imageData = ctx.getImageData(0, 0, sw, sh);
-  const data = imageData.data;
+  const data32 = new Uint32Array(imageData.data.buffer);
 
-  const thresh = contrastThreshold;
-  const bgR = 255;
-  const bgG = 255;
-  const bgB = 255;
+  const threshSq = contrastThreshold * contrastThreshold * 3;
 
   let minX = sw;
   let minY = sh;
@@ -131,48 +141,40 @@ export function measureWithContentDetection(
   let filledPixels = 0;
   let totalWeightedOpacity = 0;
 
-  for (let y = 0; y < sh; y++) {
-    const rowOffset = (y * sw) << 2;
-    for (let x = 0; x < sw; x++) {
-      const i = rowOffset + (x << 2);
+  const pixelCount = sw * sh;
+  for (let i = 0; i < pixelCount; i++) {
+    const pixel = data32[i]!;
 
-      const a = data[i + 3]!;
-      if (a <= thresh) continue;
+    const a = pixel >>> 24;
+    if (a <= contrastThreshold) continue;
 
-      const r = data[i]!;
-      const g = data[i + 1]!;
-      const b = data[i + 2]!;
+    const r = pixel & 0xff;
+    const g = (pixel >>> 8) & 0xff;
+    const b = (pixel >>> 16) & 0xff;
 
-      const dr = r - bgR;
-      const dg = g - bgG;
-      const db = b - bgB;
+    const dr = r - 255;
+    const dg = g - 255;
+    const db = b - 255;
 
-      if (
-        dr > -thresh &&
-        dr < thresh &&
-        dg > -thresh &&
-        dg < thresh &&
-        db > -thresh &&
-        db < thresh
-      )
-        continue;
+    const distSq = dr * dr + dg * dg + db * db;
+    if (distSq < threshSq) continue;
 
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
+    const x = i % sw;
+    const y = (i - x) / sw;
 
-      const distSq = dr * dr + dg * dg + db * db;
-      const aScaled = a * INV_255;
-      const weight = Math.sqrt(Math.sqrt(distSq)) * aScaled;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
 
-      totalWeight += weight;
-      weightedX += (x + 0.5) * weight;
-      weightedY += (y + 0.5) * weight;
+    const weight = distSq * a;
 
-      filledPixels++;
-      totalWeightedOpacity += aScaled;
-    }
+    totalWeight += weight;
+    weightedX += (x + 0.5) * weight;
+    weightedY += (y + 0.5) * weight;
+
+    filledPixels++;
+    totalWeightedOpacity += a;
   }
 
   if (minX > maxX || minY > maxY) {
@@ -237,7 +239,7 @@ export function measureWithContentDetection(
     } else {
       const coverageRatio = filledPixels / scanArea;
       const averageOpacity =
-        filledPixels > 0 ? totalWeightedOpacity / filledPixels : 0;
+        filledPixels > 0 ? (totalWeightedOpacity * INV_255) / filledPixels : 0;
       result.pixelDensity = coverageRatio * averageOpacity;
     }
   }
