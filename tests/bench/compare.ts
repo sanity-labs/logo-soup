@@ -1,5 +1,5 @@
 import { jStat } from "jstat";
-import { welchTTest, fmtNs } from "./welch";
+import { welchTTest, fmtNs, fmtP } from "./welch";
 
 const [baseFile, headFile] = process.argv.slice(2);
 
@@ -68,7 +68,7 @@ console.log("─".repeat(80));
 for (const r of rows) {
   const sign = r.pctChange > 0 ? "+" : "";
   const sig = r.significant
-    ? `(p=${r.p.toExponential(2)} ${r.marker})`
+    ? `(p=${fmtP(r.p)} ${r.marker})`
     : "(not significant)";
   const tag =
     r.verdict === "REGRESSION"
@@ -109,7 +109,7 @@ for (const r of rows) {
         ? "faster"
         : "unchanged";
   md.push(
-    `| ${r.name} | ${fmtNs(r.baseMean)} | ${fmtNs(r.headMean)} | ${sign}${r.pctChange.toFixed(1)}% | \`${r.p.toExponential(2)}\` ${r.marker} | ${verdict} |`,
+    `| ${r.name} | ${fmtNs(r.baseMean)} | ${fmtNs(r.headMean)} | ${sign}${r.pctChange.toFixed(1)}% | ${fmtP(r.p)} ${r.marker} | ${verdict} |`,
   );
 }
 

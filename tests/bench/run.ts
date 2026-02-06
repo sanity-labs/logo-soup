@@ -24,7 +24,7 @@ import {
   DEFAULT_SCALE_FACTOR,
 } from "../../src/constants";
 import type { LogoSource, MeasurementResult } from "../../src/types";
-import { welchTTest, fmtNs, type TTestResult } from "./welch";
+import { welchTTest, fmtNs, fmtP, type TTestResult } from "./welch";
 
 // Dimensions sourced from real SVGs in static/logos/
 const LOGO_DIMS: { w: number; h: number; name: string }[] = [
@@ -533,7 +533,7 @@ for (const comp of pComparisons) {
   console.log(
     `    ${comp.a.label}: ${fmtNs(rawA)}  vs  ${comp.b.label}: ${fmtNs(rawB)}  (${sign}${pctChange.toFixed(1)}%)`,
   );
-  console.log(`    p=${result.p.toExponential(3)}  significant=${sig}`);
+  console.log(`    p=${fmtP(result.p)}  significant=${sig}`);
   console.log();
 
   pResults.push({
@@ -593,7 +593,7 @@ for (const r of pResults) {
   const sig = r.result.significant ? `YES ${r.result.marker}` : "NO";
   const sign = r.pctChange > 0 ? "+" : "";
   md.push(
-    `| ${r.name} | ${r.aMean} | ${r.bMean} | ${sign}${r.pctChange.toFixed(1)}% | ${sig} |`,
+    `| ${r.name} | ${r.aMean} | ${r.bMean} | ${sign}${r.pctChange.toFixed(1)}% | ${fmtP(r.result.p)} ${sig} |`,
   );
 }
 

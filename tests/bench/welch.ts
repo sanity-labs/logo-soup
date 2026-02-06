@@ -30,6 +30,12 @@ export function welchTTest(a: number[], b: number[]): TTestResult {
   return { t, df, p, significant: p < 0.05, marker };
 }
 
+export function fmtP(p: number): string {
+  if (p === 0) return "<0.001";
+  if (p < 0.001) return p.toExponential(2);
+  return p.toFixed(3);
+}
+
 export function fmtNs(ns: number): string {
   if (ns < 1_000) return `${ns.toFixed(0)} ns`;
   if (ns < 1_000_000) return `${(ns / 1_000).toFixed(2)} us`;
