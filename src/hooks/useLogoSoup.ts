@@ -2,6 +2,8 @@ import { useEffect, useReducer, useRef } from "react";
 import {
   DEFAULT_BASE_SIZE,
   DEFAULT_CONTRAST_THRESHOLD,
+  DEFAULT_CROP_TO_CONTENT,
+  DEFAULT_DENSITY_AWARE,
   DEFAULT_DENSITY_FACTOR,
   DEFAULT_SCALE_FACTOR,
 } from "../constants";
@@ -63,9 +65,9 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     baseSize = DEFAULT_BASE_SIZE,
     scaleFactor = DEFAULT_SCALE_FACTOR,
     contrastThreshold = DEFAULT_CONTRAST_THRESHOLD,
-    densityAware = true,
+    densityAware = DEFAULT_DENSITY_AWARE,
     densityFactor = DEFAULT_DENSITY_FACTOR,
-    cropToContent = false,
+    cropToContent = DEFAULT_CROP_TO_CONTENT,
   } = options;
 
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
