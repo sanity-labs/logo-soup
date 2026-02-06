@@ -32,8 +32,10 @@ jobs:
 
       - name: Resolve job URL
         run: |
-          url=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --jq '.jobs[] | select(.name == "bench") | .html_url')
-          echo "BENCH_JOB_URL=$url" >> "$GITHUB_ENV"
+          job=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --jq '.jobs[] | select(.name == "bench")')
+          url=$(echo "$job" | jq -r '.html_url')
+          step=$(echo "$job" | jq -r '.steps[] | select(.name == "Benchmark (head)") | .number')
+          echo "BENCH_JOB_URL=${url}#step:${step}:1" >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
