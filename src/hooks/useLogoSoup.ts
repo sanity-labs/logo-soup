@@ -14,11 +14,8 @@ import type {
   UseLogoSoupOptions,
   UseLogoSoupResult,
 } from "../types";
-import {
-  cropToBlobUrl,
-  loadImage,
-  measureWithContentDetection,
-} from "../utils/measure";
+import { cropToBlobUrl, loadImage } from "../utils/measure";
+import { measureContentBatchAsync } from "../utils/measureAsync";
 import {
   createNormalizedLogo,
   logosEqual,
@@ -165,74 +162,130 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
       dispatch({ type: "loading" });
     }
 
-    Promise.allSettled(
-      sources.map(async (source) => {
-        let entry = cache.get(source.src);
-
-        if (!entry) {
-          const img = await loadImage(source.src);
-          if (cancelled) throw new Error("cancelled");
-
-          const measurement = measureWithContentDetection(
-            img,
-            contrastThreshold,
-            densityAware,
-          );
-          entry = { img, measurement };
-          cache.set(source.src, entry);
+    (async () => {
+      try {
+        // Phase 1: Load all uncached images in parallel
+        const uncachedEntries: { sourceIdx: number; source: LogoSource }[] = [];
+        for (let i = 0; i < sources.length; i++) {
+          if (!cache.has(sources[i]!.src)) {
+            uncachedEntries.push({ sourceIdx: i, source: sources[i]! });
+          }
         }
 
-        const effectiveDensityFactor = densityAware ? densityFactor : 0;
-
-        const normalized = createNormalizedLogo(
-          source,
-          entry.measurement,
-          baseSize,
-          scaleFactor,
-          effectiveDensityFactor,
+        const loadResults = await Promise.allSettled(
+          uncachedEntries.map((entry) => loadImage(entry.source.src)),
         );
 
-        if (cropToContent && entry.measurement.contentBox && !entry.blobUrl) {
-          const url = await cropToBlobUrl(
-            entry.img,
-            entry.measurement.contentBox,
-          );
-          if (cancelled) {
-            URL.revokeObjectURL(url);
-            throw new Error("cancelled");
+        if (cancelled) return;
+
+        // Phase 2: Batch-measure all successfully loaded images via worker pool
+        const toMeasure: {
+          img: HTMLImageElement;
+          source: LogoSource;
+        }[] = [];
+
+        for (let i = 0; i < loadResults.length; i++) {
+          const result = loadResults[i]!;
+          if (result.status === "fulfilled") {
+            toMeasure.push({
+              img: result.value,
+              source: uncachedEntries[i]!.source,
+            });
           }
-          entry.blobUrl = url;
         }
 
-        if (cropToContent && entry.blobUrl) {
-          normalized.croppedSrc = entry.blobUrl;
+        if (toMeasure.length > 0) {
+          const measurements = await measureContentBatchAsync(
+            toMeasure.map((item) => ({
+              img: item.img,
+              contrastThreshold,
+              includeDensity: densityAware,
+            })),
+          );
+
+          if (cancelled) return;
+
+          for (let i = 0; i < toMeasure.length; i++) {
+            const item = toMeasure[i]!;
+            cache.set(item.source.src, {
+              img: item.img,
+              measurement: measurements[i]!,
+            });
+          }
         }
 
-        return normalized;
-      }),
-    ).then((settled) => {
-      if (cancelled) return;
+        if (cancelled) return;
 
-      const results: NormalizedLogo[] = [];
-      let firstError: Error | undefined;
-      for (const r of settled) {
-        if (r.status === "fulfilled") {
-          results.push(r.value);
-        } else if (!firstError) {
-          firstError =
-            r.reason instanceof Error
-              ? r.reason
-              : new Error("Failed to load logo");
+        // Phase 3: Build normalized logos + optional crop
+        const effectiveDensityFactor = densityAware ? densityFactor : 0;
+        const results: NormalizedLogo[] = [];
+        let firstError: Error | undefined;
+
+        const cropPromises: Promise<void>[] = [];
+
+        for (const source of sources) {
+          const entry = cache.get(source.src);
+          if (!entry) {
+            if (!firstError) {
+              firstError = new Error(`Failed to load logo: ${source.src}`);
+            }
+            continue;
+          }
+
+          const normalized = createNormalizedLogo(
+            source,
+            entry.measurement,
+            baseSize,
+            scaleFactor,
+            effectiveDensityFactor,
+          );
+
+          if (cropToContent && entry.measurement.contentBox && !entry.blobUrl) {
+            const capturedEntry = entry;
+            const capturedNormalized = normalized;
+            cropPromises.push(
+              cropToBlobUrl(
+                capturedEntry.img,
+                capturedEntry.measurement.contentBox!,
+              )
+                .then((url) => {
+                  if (cancelled) {
+                    URL.revokeObjectURL(url);
+                    return;
+                  }
+                  capturedEntry.blobUrl = url;
+                  capturedNormalized.croppedSrc = url;
+                })
+                .catch(() => {}),
+            );
+          } else if (cropToContent && entry.blobUrl) {
+            normalized.croppedSrc = entry.blobUrl;
+          }
+
+          results.push(normalized);
         }
+
+        if (cropPromises.length > 0) {
+          await Promise.all(cropPromises);
+        }
+
+        if (cancelled) return;
+
+        if (results.length === 0 && firstError) {
+          dispatch({ type: "error", error: firstError });
+          return;
+        }
+
+        dispatch({ type: "success", normalizedLogos: results });
+      } catch (err) {
+        if (cancelled) return;
+        dispatch({
+          type: "error",
+          error:
+            err instanceof Error ? err : new Error("Failed to process logos"),
+        });
       }
-
-      if (results.length === 0 && firstError) {
-        dispatch({ type: "error", error: firstError });
-        return;
-      }
-
-      dispatch({ type: "success", normalizedLogos: results });
-    });
+    })();
 
     return () => {
       cancelled = true;

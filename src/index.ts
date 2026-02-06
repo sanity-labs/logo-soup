@@ -15,3 +15,7 @@ export type {
 } from "./types";
 export { getVisualCenterTransform } from "./utils/getVisualCenterTransform";
 export { cropToDataUrl } from "./utils/measure";
+export {
+  disposeMeasurementPool,
+  measureContentBatchAsync,
+} from "./utils/measureAsync";

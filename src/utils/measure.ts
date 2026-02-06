@@ -1,4 +1,5 @@
-import type { BoundingBox, MeasurementResult, VisualCenter } from "../types";
+import type { BoundingBox, MeasurementResult } from "../types";
+import { computeScanSize, scanPixelData } from "./scanPixels";
 
 function createReusableCanvas(
   options?: CanvasRenderingContext2DSettings,
@@ -97,9 +98,6 @@ export function measureImage(img: HTMLImageElement): MeasurementResult {
   };
 }
 
-const PIXEL_BUDGET = 2_048;
-const INV_255 = 1 / 255;
-
 export function measureWithContentDetection(
   img: HTMLImageElement,
   contrastThreshold: number = 10,
@@ -108,16 +106,9 @@ export function measureWithContentDetection(
   const w = img.naturalWidth;
   const h = img.naturalHeight;
 
-  const totalPixels = w * h;
-  const ratio =
-    totalPixels > PIXEL_BUDGET ? Math.sqrt(PIXEL_BUDGET / totalPixels) : 1;
-  const sw = Math.max(1, Math.round(w * ratio));
-  const sh = Math.max(1, Math.round(h * ratio));
-  const scaleX = w / sw;
-  const scaleY = h / sh;
+  const { sw, sh } = computeScanSize(w, h);
 
   const ctx = getMeasureContext(sw, sh);
-
   if (!ctx) {
     return { width: w, height: h };
   }
@@ -127,122 +118,5 @@ export function measureWithContentDetection(
   const imageData = ctx.getImageData(0, 0, sw, sh);
   const data32 = new Uint32Array(imageData.data.buffer);
 
-  const threshSq = contrastThreshold * contrastThreshold * 3;
-
-  let minX = sw;
-  let minY = sh;
-  let maxX = 0;
-  let maxY = 0;
-
-  let totalWeight = 0;
-  let weightedX = 0;
-  let weightedY = 0;
-
-  let filledPixels = 0;
-  let totalWeightedOpacity = 0;
-
-  const pixelCount = sw * sh;
-  for (let i = 0; i < pixelCount; i++) {
-    const pixel = data32[i]!;
-
-    const a = pixel >>> 24;
-    if (a <= contrastThreshold) continue;
-
-    const r = pixel & 0xff;
-    const g = (pixel >>> 8) & 0xff;
-    const b = (pixel >>> 16) & 0xff;
-
-    const dr = r - 255;
-    const dg = g - 255;
-    const db = b - 255;
-
-    const distSq = dr * dr + dg * dg + db * db;
-    if (distSq < threshSq) continue;
-
-    const x = i % sw;
-    const y = (i - x) / sw;
-
-    if (x < minX) minX = x;
-    if (x > maxX) maxX = x;
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-
-    const weight = distSq * a;
-
-    totalWeight += weight;
-    weightedX += (x + 0.5) * weight;
-    weightedY += (y + 0.5) * weight;
-
-    filledPixels++;
-    totalWeightedOpacity += a;
-  }
-
-  if (minX > maxX || minY > maxY) {
-    return {
-      width: w,
-      height: h,
-      contentBox: { x: 0, y: 0, width: w, height: h },
-      visualCenter: {
-        x: w / 2,
-        y: h / 2,
-        offsetX: 0,
-        offsetY: 0,
-      },
-      pixelDensity: includeDensity ? 0.5 : undefined,
-    };
-  }
-
-  const cbX = Math.floor(minX * scaleX);
-  const cbY = Math.floor(minY * scaleY);
-  const contentBox: BoundingBox = {
-    x: cbX,
-    y: cbY,
-    width: Math.min(Math.ceil((maxX + 1) * scaleX), w) - cbX,
-    height: Math.min(Math.ceil((maxY + 1) * scaleY), h) - cbY,
-  };
-
-  let visualCenter: VisualCenter;
-
-  if (totalWeight === 0) {
-    const centerX = contentBox.x + contentBox.width / 2;
-    const centerY = contentBox.y + contentBox.height / 2;
-    visualCenter = { x: centerX, y: centerY, offsetX: 0, offsetY: 0 };
-  } else {
-    const globalCenterX = (weightedX / totalWeight) * scaleX;
-    const globalCenterY = (weightedY / totalWeight) * scaleY;
-
-    const localCenterX = globalCenterX - contentBox.x;
-    const localCenterY = globalCenterY - contentBox.y;
-
-    const geometricCenterX = contentBox.width / 2;
-    const geometricCenterY = contentBox.height / 2;
-
-    visualCenter = {
-      x: globalCenterX,
-      y: globalCenterY,
-      offsetX: localCenterX - geometricCenterX,
-      offsetY: localCenterY - geometricCenterY,
-    };
-  }
-
-  const result: MeasurementResult = {
-    width: w,
-    height: h,
-    contentBox,
-    visualCenter,
-  };
-
-  if (includeDensity) {
-    const scanArea = (maxX - minX + 1) * (maxY - minY + 1);
-    if (scanArea === 0) {
-      result.pixelDensity = 0.5;
-    } else {
-      const coverageRatio = filledPixels / scanArea;
-      const averageOpacity =
-        filledPixels > 0 ? (totalWeightedOpacity * INV_255) / filledPixels : 0;
-      result.pixelDensity = coverageRatio * averageOpacity;
-    }
-  }
-
-  return result;
+  return scanPixelData(data32, sw, sh, w, h, contrastThreshold, includeDensity);
 }

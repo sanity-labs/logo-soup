@@ -12,7 +12,11 @@ import {
   DEFAULT_DENSITY_FACTOR,
   DEFAULT_SCALE_FACTOR,
 } from "../../src/constants";
-import type { LogoSource, MeasurementResult } from "../../src/types";
+import type {
+  LogoSource,
+  MeasurementResult,
+  NormalizedLogo,
+} from "../../src/types";
 import { getVisualCenterTransform } from "../../src/utils/getVisualCenterTransform";
 import {
   cropToDataUrl,
@@ -98,18 +102,30 @@ const realMeasurements: MeasurementResult[] = allLogos.map((logo) =>
   measureWithContentDetection(logo.img, DEFAULT_CONTRAST_THRESHOLD, true),
 );
 
-const normalized20 = Array.from({ length: 20 }, (_, i) => {
-  const idx = i % allLogos.length;
-  return createNormalizedLogo(
-    sources[idx]!,
-    realMeasurements[idx]!,
-    DEFAULT_BASE_SIZE,
-    DEFAULT_SCALE_FACTOR,
-    DEFAULT_DENSITY_FACTOR,
-  );
-});
+function makeNormalized(count: number) {
+  return Array.from({ length: count }, (_, i) => {
+    const idx = i % allLogos.length;
+    return createNormalizedLogo(
+      sources[idx]!,
+      realMeasurements[idx]!,
+      DEFAULT_BASE_SIZE,
+      DEFAULT_SCALE_FACTOR,
+      DEFAULT_DENSITY_FACTOR,
+    );
+  });
+}
 
-const logos20 = allLogos.slice(0, 20);
+function makeLogosSlice(count: number) {
+  return Array.from(
+    { length: count },
+    (_, i) => allLogos[i % allLogos.length]!,
+  );
+}
+
+const normalized20 = makeNormalized(20);
+const normalized50 = makeNormalized(50);
+const logos20 = makeLogosSlice(20);
+const logos50 = makeLogosSlice(50);
 
 const TIME_BUDGET_MS = QUICK ? 800 : 2_000;
 const MIN_SAMPLES = QUICK ? 20 : 30;
@@ -155,51 +171,83 @@ function stats(samples: number[]) {
   return { mean: m, min, max, stddev };
 }
 
-const benchGetVCT20 = () => {
-  for (let i = 0; i < 20; i++)
-    getVisualCenterTransform(normalized20[i]!, DEFAULT_ALIGN_BY);
-};
+function makeBenchRenderPass(normalized: NormalizedLogo[]) {
+  return () => {
+    for (let i = 0; i < normalized.length; i++)
+      getVisualCenterTransform(normalized[i]!, DEFAULT_ALIGN_BY);
+  };
+}
 
 const benchMeasure = () =>
   measureWithContentDetection(medianLogo.img, DEFAULT_CONTRAST_THRESHOLD, true);
 
-const benchMount20 = () => {
-  for (let i = 0; i < 20; i++) {
-    const m = measureWithContentDetection(
-      logos20[i]!.img,
-      DEFAULT_CONTRAST_THRESHOLD,
-      true,
-    );
-    const logo = createNormalizedLogo(
-      sources[i]!,
-      m,
-      DEFAULT_BASE_SIZE,
-      DEFAULT_SCALE_FACTOR,
-      DEFAULT_DENSITY_FACTOR,
-    );
-    blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
-  }
-};
+function makeBenchMount(logos: RenderedLogo[]) {
+  return () => {
+    for (let i = 0; i < logos.length; i++) {
+      const m = measureWithContentDetection(
+        logos[i]!.img,
+        DEFAULT_CONTRAST_THRESHOLD,
+        true,
+      );
+      const logo = createNormalizedLogo(
+        sources[i % allLogos.length]!,
+        m,
+        DEFAULT_BASE_SIZE,
+        DEFAULT_SCALE_FACTOR,
+        DEFAULT_DENSITY_FACTOR,
+      );
+      blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
+    }
+  };
+}
 
-const benchMount20Baseline = () => {
-  for (let i = 0; i < 20; i++) {
-    const m = measureImage(logos20[i]!.img);
-    const logo = createNormalizedLogo(
-      sources[i]!,
-      m,
-      DEFAULT_BASE_SIZE,
-      DEFAULT_SCALE_FACTOR,
-      0,
-    );
-    blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
-  }
-};
+function makeBenchMountBaseline(logos: RenderedLogo[]) {
+  return () => {
+    for (let i = 0; i < logos.length; i++) {
+      const m = measureImage(logos[i]!.img);
+      const logo = createNormalizedLogo(
+        sources[i % allLogos.length]!,
+        m,
+        DEFAULT_BASE_SIZE,
+        DEFAULT_SCALE_FACTOR,
+        0,
+      );
+      blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
+    }
+  };
+}
+
+function makeBenchReNormalize(count: number) {
+  return () => {
+    for (let i = 0; i < count; i++) {
+      const idx = i % allLogos.length;
+      const logo = createNormalizedLogo(
+        sources[idx]!,
+        realMeasurements[idx]!,
+        DEFAULT_BASE_SIZE,
+        DEFAULT_SCALE_FACTOR,
+        DEFAULT_DENSITY_FACTOR,
+      );
+      blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
+    }
+  };
+}
+
+const benchRenderPass20 = makeBenchRenderPass(normalized20);
+const benchRenderPass50 = makeBenchRenderPass(normalized50);
+const benchMount20 = makeBenchMount(logos20);
+const benchMount50 = makeBenchMount(logos50);
+const benchMountBaseline20 = makeBenchMountBaseline(logos20);
+const benchMountBaseline50 = makeBenchMountBaseline(logos50);
 
 const keyBenchmarks: Record<string, () => void> = {
   "content detection (1 logo)": benchMeasure,
-  "render pass (20 logos)": benchGetVCT20,
-  "mount 20 logos (no detection)": benchMount20Baseline,
+  "render pass (20 logos)": benchRenderPass20,
+  "render pass (50 logos)": benchRenderPass50,
+  "mount 20 logos (no detection)": benchMountBaseline20,
   "mount 20 logos (defaults)": benchMount20,
+  "mount 50 logos (no detection)": benchMountBaseline50,
+  "mount 50 logos (defaults)": benchMount50,
 };
 
 console.log();
@@ -243,20 +291,6 @@ md.push("");
 if (!QUICK) {
   const medianMeasurement = realMeasurements[allLogos.indexOf(medianLogo)]!;
 
-  const benchReNormalize20 = () => {
-    for (let i = 0; i < 20; i++) {
-      const idx = i % allLogos.length;
-      const logo = createNormalizedLogo(
-        sources[idx]!,
-        realMeasurements[idx]!,
-        DEFAULT_BASE_SIZE,
-        DEFAULT_SCALE_FACTOR,
-        DEFAULT_DENSITY_FACTOR,
-      );
-      blackhole(getVisualCenterTransform(logo, DEFAULT_ALIGN_BY));
-    }
-  };
-
   const abComparisons = [
     {
       name: "densityAware: true vs false",
@@ -273,7 +307,7 @@ if (!QUICK) {
     },
     {
       name: "alignBy: visual-center-y vs bounds",
-      a: { label: "visual-center-y", fn: benchGetVCT20 },
+      a: { label: "visual-center-y", fn: benchRenderPass20 },
       b: {
         label: "bounds",
         fn: () => {
@@ -296,9 +330,14 @@ if (!QUICK) {
       b: { label: "false (noop)", fn: () => {} },
     },
     {
-      name: "layout update: full mount vs cached",
+      name: "layout update 20: full mount vs cached",
       a: { label: "full mount", fn: benchMount20 },
-      b: { label: "cached re-normalize", fn: benchReNormalize20 },
+      b: { label: "cached re-normalize", fn: makeBenchReNormalize(20) },
+    },
+    {
+      name: "layout update 50: full mount vs cached",
+      a: { label: "full mount", fn: benchMount50 },
+      b: { label: "cached re-normalize", fn: makeBenchReNormalize(50) },
     },
   ];
 
