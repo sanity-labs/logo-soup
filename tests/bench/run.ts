@@ -356,25 +356,30 @@ const md: string[] = [
   `Test fixtures: ${allLogos.length} real SVGs from static/logos/. ` +
     `${TIME_BUDGET_MS}ms budget per bench, ${MIN_SAMPLES}-${MAX_SAMPLES} samples.`,
   "",
-  "### Feature Comparisons (Welch's t-test)",
-  "",
-  "| Test | A | B | Delta | Sig |",
-  "|:-----|--:|--:|------:|:----|",
 ];
 
-for (const r of abResults) {
-  const sig = r.result.significant ? `YES ${r.result.marker}` : "NO";
-  const sign = r.pctChange > 0 ? "+" : "";
+if (abResults.length > 0) {
   md.push(
-    `| ${r.name} | ${r.aMean} | ${r.bMean} | ${sign}${r.pctChange.toFixed(1)}% | ${fmtP(r.result.p)} ${sig} |`,
+    "### Feature Comparisons (Welch's t-test)",
+    "",
+    "| Test | A | B | Delta | Sig |",
+    "|:-----|--:|--:|------:|:----|",
+  );
+
+  for (const r of abResults) {
+    const sig = r.result.significant ? `YES ${r.result.marker}` : "NO";
+    const sign = r.pctChange > 0 ? "+" : "";
+    md.push(
+      `| ${r.name} | ${r.aMean} | ${r.bMean} | ${sign}${r.pctChange.toFixed(1)}% | ${fmtP(r.result.p)} ${sig} |`,
+    );
+  }
+
+  md.push(
+    "",
+    "A/B columns match the order in the test name. Sig: `*` p<0.05, `**` p<0.01, `***` p<0.001.",
+    "",
   );
 }
-
-md.push("");
-md.push(
-  "A/B columns match the order in the test name. Sig: `*` p<0.05, `**` p<0.01, `***` p<0.001.",
-);
-md.push("");
 
 const outDir = process.env.BENCH_OUT_DIR ?? "tmp";
 mkdirSync(outDir, { recursive: true });
