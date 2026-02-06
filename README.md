@@ -203,6 +203,10 @@ All processing happens client-side using canvas. No AI, fully deterministic.
 
 The normalization core is plain JavaScript — React is just the wrapper. If you'd like to port Logo Soup to Vue, Svelte, Angular, or any other framework, go for it! We'd appreciate a link back to this repo, and let us know so we can link to your port from here.
 
+### Community Ports
+
+- **[Logo Soup](https://github.com/auroris/logo-soup)** — Vanilla HTML/JS implementation, no framework required
+
 ## Development
 
 ```bash
