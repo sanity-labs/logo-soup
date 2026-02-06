@@ -64,7 +64,7 @@ const svgFiles = readdirSync(LOGOS_DIR)
   .filter((f) => f.endsWith(".svg"))
   .sort();
 
-const QUICK = !!(process.env.BENCH_QUICK || process.env.CI);
+const QUICK = !!process.env.CI;
 
 console.log(
   `Loading ${svgFiles.length} real SVGs from static/logos/…${QUICK ? " (quick mode)" : ""}`,
