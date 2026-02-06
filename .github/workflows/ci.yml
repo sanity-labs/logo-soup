@@ -35,18 +35,9 @@ jobs:
       - name: Benchmark (main baseline)
         if: github.event_name == 'pull_request'
         run: |
-          cp head-samples.json /tmp/head-samples.json
-          cp benchmark-report.md /tmp/benchmark-report.md
-
-          git checkout ${{ github.event.pull_request.base.sha }}
-          bun install --frozen-lockfile
+          git checkout ${{ github.event.pull_request.base.sha }} -- src/
           BENCH_SAMPLES_PATH=/tmp/base-samples.json bun run bench
-
-          git checkout ${{ github.sha }}
-          bun install --frozen-lockfile
-
-          cp /tmp/head-samples.json head-samples.json
-          cp /tmp/benchmark-report.md benchmark-report.md
+          git checkout ${{ github.sha }} -- src/
         env:
           NODE_ENV: development
 
@@ -54,7 +45,8 @@ jobs:
         if: github.event_name == 'pull_request'
         id: compare
         run: |
-          bun tests/bench/compare.ts /tmp/base-samples.json head-samples.json || true
+          bun tests/bench/compare.ts /tmp/base-samples.json head-samples.json
+        continue-on-error: true
         env:
           NODE_ENV: development
 
