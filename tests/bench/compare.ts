@@ -1,5 +1,5 @@
 import { jStat } from "jstat";
-import { welchTTest } from "./welch";
+import { welchTTest, fmtNs } from "./welch";
 
 const [baseFile, headFile] = process.argv.slice(2);
 
@@ -12,13 +12,7 @@ const base: Record<string, number[]> = await Bun.file(baseFile).json();
 const head: Record<string, number[]> = await Bun.file(headFile).json();
 
 const THRESHOLD_PCT = 5;
-
-function fmtNs(ns: number): string {
-  if (ns < 1_000) return `${ns.toFixed(0)} ns`;
-  if (ns < 1_000_000) return `${(ns / 1_000).toFixed(2)} us`;
-  if (ns < 1_000_000_000) return `${(ns / 1_000_000).toFixed(2)} ms`;
-  return `${(ns / 1_000_000_000).toFixed(3)} s`;
-}
+const THRESHOLD_ABS_NS = 100_000; // 100us — ignore noise below this
 
 interface Row {
   name: string;
@@ -43,8 +37,13 @@ for (const name of Object.keys(base)) {
   const pctChange = ((headMean - baseMean) / baseMean) * 100;
   const result = welchTTest(headSamples, baseSamples);
 
+  const absDelta = Math.abs(headMean - baseMean);
   let verdict = "unchanged";
-  if (result.significant && Math.abs(pctChange) >= THRESHOLD_PCT) {
+  if (
+    result.significant &&
+    Math.abs(pctChange) >= THRESHOLD_PCT &&
+    absDelta >= THRESHOLD_ABS_NS
+  ) {
     verdict = pctChange > 0 ? "REGRESSION" : "faster";
   }
 
@@ -61,7 +60,6 @@ for (const name of Object.keys(base)) {
 }
 
 const regressions = rows.filter((r) => r.verdict === "REGRESSION");
-const improvements = rows.filter((r) => r.verdict === "faster");
 
 console.log("─".repeat(80));
 console.log("  BENCHMARK COMPARISON: main vs PR");
@@ -69,9 +67,18 @@ console.log("─".repeat(80));
 
 for (const r of rows) {
   const sign = r.pctChange > 0 ? "+" : "";
-  const sig = r.significant ? `(p=${r.p.toExponential(2)} ${r.marker})` : "(not significant)";
-  const tag = r.verdict === "REGRESSION" ? " << REGRESSION" : r.verdict === "faster" ? " << faster" : "";
-  console.log(`  ${r.name}: ${fmtNs(r.baseMean)} -> ${fmtNs(r.headMean)} (${sign}${r.pctChange.toFixed(1)}%) ${sig}${tag}`);
+  const sig = r.significant
+    ? `(p=${r.p.toExponential(2)} ${r.marker})`
+    : "(not significant)";
+  const tag =
+    r.verdict === "REGRESSION"
+      ? " << REGRESSION"
+      : r.verdict === "faster"
+        ? " << faster"
+        : "";
+  console.log(
+    `  ${r.name}: ${fmtNs(r.baseMean)} -> ${fmtNs(r.headMean)} (${sign}${r.pctChange.toFixed(1)}%) ${sig}${tag}`,
+  );
 }
 
 if (regressions.length > 0) {
@@ -87,7 +94,7 @@ console.log("─".repeat(80));
 const md: string[] = [
   "# Benchmark Comparison: main vs PR",
   "",
-  `> Threshold for flagging: ${THRESHOLD_PCT}% change + statistically significant (p<0.05)`,
+  `> Threshold: ${THRESHOLD_PCT}%+ change, >${THRESHOLD_ABS_NS / 1_000}us absolute delta, and statistically significant (p<0.05)`,
   "",
   "| Benchmark | main | PR | Change | p-value | Verdict |",
   "|:----------|:-----|:---|:-------|:--------|:--------|",
@@ -128,7 +135,9 @@ try {
 const summaryPath = process.env.GITHUB_STEP_SUMMARY;
 if (summaryPath) {
   try {
-    const existing = await Bun.file(summaryPath).text().catch(() => "");
+    const existing = await Bun.file(summaryPath)
+      .text()
+      .catch(() => "");
     await Bun.write(summaryPath, existing + "\n" + mdContent);
   } catch {
     // non-critical

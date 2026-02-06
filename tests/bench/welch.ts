@@ -29,3 +29,10 @@ export function welchTTest(a: number[], b: number[]): TTestResult {
 
   return { t, df, p, significant: p < 0.05, marker };
 }
+
+export function fmtNs(ns: number): string {
+  if (ns < 1_000) return `${ns.toFixed(0)} ns`;
+  if (ns < 1_000_000) return `${(ns / 1_000).toFixed(2)} us`;
+  if (ns < 1_000_000_000) return `${(ns / 1_000_000).toFixed(2)} ms`;
+  return `${(ns / 1_000_000_000).toFixed(3)} s`;
+}

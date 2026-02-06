@@ -2,7 +2,6 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 GlobalRegistrator.register();
 
 import { bench, boxplot, summary, run, do_not_optimize } from "mitata";
-import { jStat } from "jstat";
 
 import {
   normalizeSource,
@@ -25,7 +24,7 @@ import {
   DEFAULT_SCALE_FACTOR,
 } from "../../src/constants";
 import type { LogoSource, MeasurementResult } from "../../src/types";
-import { welchTTest, type TTestResult } from "./welch";
+import { welchTTest, fmtNs, type TTestResult } from "./welch";
 
 // Dimensions sourced from real SVGs in static/logos/
 const LOGO_DIMS: { w: number; h: number; name: string }[] = [
@@ -408,12 +407,21 @@ function collectSamples(fn: () => void): number[] {
   return samples;
 }
 
-function fmtNs(ns: number): string {
-  if (ns < 1_000) return `${ns.toFixed(0)} ns`;
-  if (ns < 1_000_000) return `${(ns / 1_000).toFixed(2)} us`;
-  if (ns < 1_000_000_000) return `${(ns / 1_000_000).toFixed(2)} ms`;
-  return `${(ns / 1_000_000_000).toFixed(3)} s`;
-}
+const benchCalcDimsWithDensity = () =>
+  calculateNormalizedDimensions(
+    measurements[0]!,
+    DEFAULT_BASE_SIZE,
+    DEFAULT_SCALE_FACTOR,
+    DEFAULT_DENSITY_FACTOR,
+  );
+
+const benchGetVCT20 = () => {
+  for (let i = 0; i < 20; i++)
+    getVisualCenterTransform(logos20[i]!, DEFAULT_ALIGN_BY);
+};
+
+const benchFullPipelineDensityOn = () =>
+  measureWithContentDetection(medium!.img, DEFAULT_CONTRAST_THRESHOLD, true);
 
 interface PComparison {
   name: string;
@@ -424,16 +432,7 @@ interface PComparison {
 const pComparisons: PComparison[] = [
   {
     name: "Density compensation (1 logo, 400x200)",
-    a: {
-      label: "calcDims WITH density",
-      fn: () =>
-        calculateNormalizedDimensions(
-          measurements[0]!,
-          DEFAULT_BASE_SIZE,
-          DEFAULT_SCALE_FACTOR,
-          DEFAULT_DENSITY_FACTOR,
-        ),
-    },
+    a: { label: "calcDims WITH density", fn: benchCalcDimsWithDensity },
     b: {
       label: "calcDims WITHOUT density",
       fn: () =>
@@ -447,13 +446,7 @@ const pComparisons: PComparison[] = [
   },
   {
     name: "Alignment mode: visual-center-y vs bounds (20 logos)",
-    a: {
-      label: "visual-center-y x 20",
-      fn: () => {
-        for (let i = 0; i < 20; i++)
-          getVisualCenterTransform(logos20[i]!, DEFAULT_ALIGN_BY);
-      },
-    },
+    a: { label: "visual-center-y x 20", fn: benchGetVCT20 },
     b: {
       label: "bounds x 20",
       fn: () => {
@@ -464,15 +457,7 @@ const pComparisons: PComparison[] = [
   },
   {
     name: `Full pipeline: density ON vs OFF (1 logo, ${medium!.label})`,
-    a: {
-      label: "density ON",
-      fn: () =>
-        measureWithContentDetection(
-          medium!.img,
-          DEFAULT_CONTRAST_THRESHOLD,
-          true,
-        ),
-    },
+    a: { label: "density ON", fn: benchFullPipelineDensityOn },
     b: {
       label: "density OFF",
       fn: () =>
@@ -538,8 +523,8 @@ for (const comp of pComparisons) {
   const samplesA = collectSamples(comp.a.fn);
   const samplesB = collectSamples(comp.b.fn);
   const result = welchTTest(samplesA, samplesB);
-  const rawA = jStat.mean(samplesA);
-  const rawB = jStat.mean(samplesB);
+  const rawA = samplesA.reduce((s, v) => s + v, 0) / samplesA.length;
+  const rawB = samplesB.reduce((s, v) => s + v, 0) / samplesB.length;
   const pctChange = rawB !== 0 ? ((rawA - rawB) / rawB) * 100 : 0;
 
   const sig = result.significant ? `YES ${result.marker}` : "NO";
@@ -564,17 +549,8 @@ for (const comp of pComparisons) {
 
 // Key benchmark sampling for cross-branch comparison
 const keyBenchmarks: Record<string, () => void> = {
-  "getVCT x 20": () => {
-    for (let i = 0; i < 20; i++)
-      getVisualCenterTransform(logos20[i]!, DEFAULT_ALIGN_BY);
-  },
-  "calcDims with density": () =>
-    calculateNormalizedDimensions(
-      measurements[0]!,
-      DEFAULT_BASE_SIZE,
-      DEFAULT_SCALE_FACTOR,
-      DEFAULT_DENSITY_FACTOR,
-    ),
+  "getVCT x 20": benchGetVCT20,
+  "calcDims with density": benchCalcDimsWithDensity,
   createNormalizedLogo: () =>
     createNormalizedLogo(
       sources[0]!,
@@ -583,8 +559,7 @@ const keyBenchmarks: Record<string, () => void> = {
       DEFAULT_SCALE_FACTOR,
       DEFAULT_DENSITY_FACTOR,
     ),
-  [`fullPipeline ${medium!.label} density ON`]: () =>
-    measureWithContentDetection(medium!.img, DEFAULT_CONTRAST_THRESHOLD, true),
+  [`fullPipeline ${medium!.label} density ON`]: benchFullPipelineDensityOn,
   [`worstCase 1 x ${medium!.label}`]: () => worstCaseRun(medium!.img, 1),
   [`worstCase 20 x ${medium!.label}`]: () => worstCaseRun(medium!.img, 20),
 };
