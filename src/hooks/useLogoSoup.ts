@@ -140,8 +140,9 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
         return entry && !entry.blobUrl && entry.measurement.contentBox;
       });
 
+    const effectiveDensityFactor = densityAware ? densityFactor : 0;
+
     if (allCached && !needsCrop) {
-      const effectiveDensityFactor = densityAware ? densityFactor : 0;
       const results = sources.map((source) => {
         const entry = cache.get(source.src)!;
         const normalized = createNormalizedLogo(
@@ -181,8 +182,6 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
           entry = { img, measurement };
           cache.set(source.src, entry);
         }
-
-        const effectiveDensityFactor = densityAware ? densityFactor : 0;
 
         const normalized = createNormalizedLogo(
           source,
