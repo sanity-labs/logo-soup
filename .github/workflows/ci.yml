@@ -34,18 +34,26 @@ jobs:
         env:
           NODE_ENV: development
 
-      - name: Benchmark (main baseline)
-        if: github.event_name == 'pull_request'
+      - name: Resolve baseline ref
         run: |
-          git checkout ${{ github.event.pull_request.base.sha }} -- src/
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_ENV"
+            echo "BENCH_LABEL=$GITHUB_HEAD_REF" >> "$GITHUB_ENV"
+          else
+            echo "BASE_SHA=HEAD~1" >> "$GITHUB_ENV"
+            echo "BENCH_LABEL=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Benchmark (baseline)
+        run: |
+          git checkout "$BASE_SHA" -- src/
           BENCH_OUT_DIR=/tmp/baseline bun run bench
-          git checkout ${{ github.sha }} -- src/
+          git checkout "${{ github.sha }}" -- src/
         env:
           NODE_ENV: development
 
-      - name: Compare against main
-        if: github.event_name == 'pull_request'
-        run: bun tests/bench/compare.ts /tmp/baseline/benchmark-samples.json tmp/benchmark-samples.json "$GITHUB_HEAD_REF"
+      - name: Compare against baseline
+        run: bun tests/bench/compare.ts /tmp/baseline/benchmark-samples.json tmp/benchmark-samples.json "$BENCH_LABEL"
         continue-on-error: true
         env:
           NODE_ENV: development
@@ -56,13 +64,7 @@ jobs:
           RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
           : > /tmp/summary.md
-          if [ -f tmp/benchmark-comparison.md ]; then
-            cat tmp/benchmark-comparison.md >> /tmp/summary.md
-            echo "" >> /tmp/summary.md
-          elif [ -f tmp/benchmark-report.md ]; then
-            cat tmp/benchmark-report.md >> /tmp/summary.md
-            echo "" >> /tmp/summary.md
-          fi
+          [ -f tmp/benchmark-comparison.md ] && cat tmp/benchmark-comparison.md >> /tmp/summary.md && echo "" >> /tmp/summary.md
           [ -f tmp/benchmark-features.md ] && cat tmp/benchmark-features.md >> /tmp/summary.md && echo "" >> /tmp/summary.md
           [ -s /tmp/summary.md ] && echo "Full benchmark output in the [CI job logs](${RUN_URL})." >> /tmp/summary.md
 
