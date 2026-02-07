@@ -59,11 +59,11 @@ jobs:
           if [ -f tmp/benchmark-comparison.md ]; then
             cat tmp/benchmark-comparison.md >> /tmp/summary.md
             echo "" >> /tmp/summary.md
-            [ -f tmp/benchmark-features.md ] && cat tmp/benchmark-features.md >> /tmp/summary.md && echo "" >> /tmp/summary.md
           elif [ -f tmp/benchmark-report.md ]; then
             cat tmp/benchmark-report.md >> /tmp/summary.md
             echo "" >> /tmp/summary.md
           fi
+          [ -f tmp/benchmark-features.md ] && cat tmp/benchmark-features.md >> /tmp/summary.md && echo "" >> /tmp/summary.md
           [ -s /tmp/summary.md ] && echo "Full benchmark output in the [CI job logs](${RUN_URL})." >> /tmp/summary.md
 
           [ -s /tmp/summary.md ] && cat /tmp/summary.md >> "$GITHUB_STEP_SUMMARY"
