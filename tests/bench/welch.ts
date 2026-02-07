@@ -119,3 +119,15 @@ export function fmtNs(ns: number): string {
   if (ns < 1_000_000_000) return `${(ns / 1_000_000).toFixed(2)} ms`;
   return `${(ns / 1_000_000_000).toFixed(3)} s`;
 }
+
+export function fmtCost(
+  meanA: number,
+  meanB: number,
+  significant: boolean,
+): string {
+  if (!significant) return "~same";
+  const ratio = meanA / meanB;
+  if (ratio > 1000) return fmtNs(meanA);
+  if (ratio >= 2) return `${Math.round(ratio)}× slower`;
+  return `+${fmtNs(meanA - meanB)}`;
+}
