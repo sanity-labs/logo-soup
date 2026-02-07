@@ -34,18 +34,27 @@ jobs:
         env:
           NODE_ENV: development
 
-      - name: Benchmark (main baseline)
-        if: github.event_name == 'pull_request'
+      - name: Benchmark (baseline)
         run: |
-          git checkout ${{ github.event.pull_request.base.sha }} -- src/
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="HEAD~1"
+          fi
+          git checkout "$BASE_SHA" -- src/
           BENCH_OUT_DIR=/tmp/baseline bun run bench
-          git checkout ${{ github.sha }} -- src/
+          git checkout "${{ github.sha }}" -- src/
         env:
           NODE_ENV: development
 
-      - name: Compare against main
-        if: github.event_name == 'pull_request'
-        run: bun tests/bench/compare.ts /tmp/baseline/benchmark-samples.json tmp/benchmark-samples.json "$GITHUB_HEAD_REF"
+      - name: Compare against baseline
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            LABEL="$GITHUB_HEAD_REF"
+          else
+            LABEL="${GITHUB_SHA::7}"
+          fi
+          bun tests/bench/compare.ts /tmp/baseline/benchmark-samples.json tmp/benchmark-samples.json "$LABEL"
         continue-on-error: true
         env:
           NODE_ENV: development
