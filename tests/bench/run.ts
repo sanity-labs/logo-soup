@@ -221,23 +221,6 @@ for (const [name, fn] of Object.entries(keyBenchmarks)) {
   );
 }
 
-const reportMd: string[] = [
-  "## react-logo-soup Benchmark Report",
-  "",
-  `Test fixtures: ${allLogos.length} real SVGs from static/logos/. ` +
-    `${TIME_BUDGET_MS}ms budget per bench, ${MIN_SAMPLES}-${MAX_SAMPLES} samples.`,
-  "",
-  "| Benchmark | Mean | ± Stddev | Samples |",
-  "|:----------|-----:|---------:|--------:|",
-];
-
-for (const [name, samples] of Object.entries(benchSamples)) {
-  const s = stats(samples);
-  reportMd.push(
-    `| ${name} | ${fmtNs(s.mean)} | ${fmtNs(s.stddev)} | ${samples.length} |`,
-  );
-}
-
 const medianMeasurement = realMeasurements[allLogos.indexOf(medianLogo)]!;
 
 const benchReNormalize20 = () => {
@@ -342,7 +325,6 @@ const outDir = process.env.BENCH_OUT_DIR ?? "tmp";
 mkdirSync(outDir, { recursive: true });
 
 const writes = [
-  [join(outDir, "benchmark-report.md"), reportMd.join("\n")],
   [join(outDir, "benchmark-features.md"), featuresMd.join("\n")],
   [join(outDir, "benchmark-samples.json"), JSON.stringify(benchSamples)],
 ] as const;
