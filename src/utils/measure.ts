@@ -98,7 +98,6 @@ export function measureImage(img: HTMLImageElement): MeasurementResult {
 }
 
 const PIXEL_BUDGET = 2_048;
-const INV_255 = 1 / 255;
 
 export function measureWithContentDetection(
   img: HTMLImageElement,
@@ -127,7 +126,7 @@ export function measureWithContentDetection(
   const imageData = ctx.getImageData(0, 0, sw, sh);
   const data32 = new Uint32Array(imageData.data.buffer);
 
-  const threshSq = contrastThreshold * contrastThreshold * 3;
+  const contrastDistanceSq = contrastThreshold * contrastThreshold * 3;
 
   let minX = sw;
   let minY = sh;
@@ -157,7 +156,7 @@ export function measureWithContentDetection(
     const db = b - 255;
 
     const distSq = dr * dr + dg * dg + db * db;
-    if (distSq < threshSq) continue;
+    if (distSq < contrastDistanceSq) continue;
 
     const x = i % sw;
     const y = (i - x) / sw;
@@ -239,7 +238,7 @@ export function measureWithContentDetection(
     } else {
       const coverageRatio = filledPixels / scanArea;
       const averageOpacity =
-        filledPixels > 0 ? (totalWeightedOpacity * INV_255) / filledPixels : 0;
+        filledPixels > 0 ? totalWeightedOpacity / 255 / filledPixels : 0;
       result.pixelDensity = coverageRatio * averageOpacity;
     }
   }

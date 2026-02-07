@@ -4,6 +4,17 @@ import { useLogoSoup } from "../hooks/useLogoSoup";
 import type { ImageRenderProps, LogoSoupProps } from "../types";
 import { getVisualCenterTransform } from "../utils/getVisualCenterTransform";
 
+const logoWrapperStyle: CSSProperties = {
+  display: "inline-block",
+  verticalAlign: "middle",
+  transition: "opacity 0.2s ease-in-out",
+};
+
+const logoImageStyle: CSSProperties = {
+  display: "block",
+  objectFit: "contain",
+};
+
 function DefaultImage(props: ImageRenderProps) {
   return <img {...props} />;
 }
@@ -66,11 +77,9 @@ export function LogoSoup({
           <span
             key={`${logo.src}-${index}`}
             style={{
-              display: "inline-block",
-              verticalAlign: "middle",
+              ...logoWrapperStyle,
               padding: halfGap,
               opacity: isLoading ? 0 : 1,
-              transition: "opacity 0.2s ease-in-out",
             }}
           >
             <ImageComponent
@@ -79,10 +88,9 @@ export function LogoSoup({
               width={logo.normalizedWidth}
               height={logo.normalizedHeight}
               style={{
-                display: "block",
+                ...logoImageStyle,
                 width: logo.normalizedWidth,
                 height: logo.normalizedHeight,
-                objectFit: "contain",
                 transform,
               }}
             />
