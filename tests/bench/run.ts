@@ -306,8 +306,7 @@ console.log("  Legend: * p<0.05  ** p<0.01  *** p<0.001");
 console.log("─".repeat(72));
 
 const featuresMd: string[] = [
-  "<details>",
-  "<summary>Feature cost breakdown (not PR-specific)</summary>",
+  "### Feature cost breakdown",
   "",
   "How expensive are individual features? Measured on this run's HEAD commit.",
   "",
@@ -337,7 +336,7 @@ for (const comp of abComparisons) {
   );
 }
 
-featuresMd.push("", "</details>");
+featuresMd.push("");
 
 const outDir = process.env.BENCH_OUT_DIR ?? "tmp";
 mkdirSync(outDir, { recursive: true });
