@@ -254,9 +254,11 @@ export function measureWithContentDetection(
     if (a <= contrastThreshold) continue;
 
     let weight: number;
+    let opacity: number;
 
     if (alphaOnly) {
       weight = a * a;
+      opacity = a;
     } else {
       const r = pixel & 0xff;
       const g = (pixel >>> 8) & 0xff;
@@ -270,6 +272,7 @@ export function measureWithContentDetection(
       if (distSq < contrastDistanceSq) continue;
 
       weight = distSq * a;
+      opacity = Math.min(a, Math.sqrt(distSq));
     }
 
     const x = i % sw;
@@ -285,7 +288,7 @@ export function measureWithContentDetection(
     weightedY += (y + 0.5) * weight;
 
     filledPixels++;
-    totalWeightedOpacity += a;
+    totalWeightedOpacity += opacity;
   }
 
   if (minX > maxX || minY > maxY) {

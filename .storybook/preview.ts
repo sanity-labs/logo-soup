@@ -9,6 +9,15 @@ const preview: Preview = {
       },
     },
     layout: "centered",
+    options: {
+      storySort: {
+        order: [
+          "LogoSoup",
+          ["Default", "Dark Mode", "JPG", "Comparison"],
+          "No Optimization (Worst Case)",
+        ],
+      },
+    },
   },
 };
 
