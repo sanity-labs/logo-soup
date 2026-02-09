@@ -3,6 +3,7 @@ export { DEFAULT_ALIGN_BY } from "./constants";
 export { useLogoSoup } from "./hooks/useLogoSoup";
 export type {
   AlignmentMode,
+  BackgroundColor,
   BoundingBox,
   ImageRenderProps,
   LogoSoupProps,

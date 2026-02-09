@@ -1,4 +1,9 @@
-import type { BoundingBox, MeasurementResult, VisualCenter } from "../types";
+import type {
+  BackgroundColor,
+  BoundingBox,
+  MeasurementResult,
+  VisualCenter,
+} from "../types";
 
 function createReusableCanvas(
   options?: CanvasRenderingContext2DSettings,
@@ -95,6 +100,28 @@ export function measureImage(img: HTMLImageElement): MeasurementResult {
     width: img.naturalWidth,
     height: img.naturalHeight,
   };
+}
+
+let _colorCtx: CanvasRenderingContext2D | null = null;
+
+export function resolveBackgroundColor(
+  color: BackgroundColor,
+): [number, number, number] {
+  if (Array.isArray(color)) return color;
+
+  if (!_colorCtx) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    _colorCtx = canvas.getContext("2d");
+  }
+
+  if (!_colorCtx) return [255, 255, 255];
+
+  _colorCtx.fillStyle = color;
+  _colorCtx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = _colorCtx.getImageData(0, 0, 1, 1).data;
+  return [r!, g!, b!];
 }
 
 interface PerimeterAnalysis {
