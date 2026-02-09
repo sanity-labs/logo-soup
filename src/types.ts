@@ -52,6 +52,7 @@ export interface MeasurementResult {
   contentBox?: BoundingBox;
   pixelDensity?: number;
   visualCenter?: VisualCenter;
+  backgroundLuminance?: number;
 }
 
 export type ImageRenderProps = ImgHTMLAttributes<HTMLImageElement> & {

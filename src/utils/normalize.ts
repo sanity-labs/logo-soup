@@ -50,6 +50,18 @@ export function calculateNormalizedDimensions(
   let normalizedWidth = aspectRatio ** scaleFactor * baseSize;
   let normalizedHeight = normalizedWidth / aspectRatio;
 
+  // Irradiation compensation: light content on dark backgrounds appears
+  // larger due to optical illusion. Scale down proportionally to how dark
+  // the detected background is. Only applies to opaque images where
+  // backgroundLuminance is available (transparent images are unaffected).
+  if (measurement.backgroundLuminance !== undefined) {
+    const maxCompensation = 0.05;
+    const irradiationScale =
+      1 - (1 - measurement.backgroundLuminance) * maxCompensation;
+    normalizedWidth *= irradiationScale;
+    normalizedHeight *= irradiationScale;
+  }
+
   // Apply density compensation if available
   // Dense logos (high pixel density) get scaled down
   // Light/thin logos (low pixel density) get scaled up

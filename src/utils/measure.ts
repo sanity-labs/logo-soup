@@ -373,6 +373,10 @@ export function measureWithContentDetection(
     visualCenter,
   };
 
+  if (!alphaOnly) {
+    result.backgroundLuminance = (bgR * 299 + bgG * 587 + bgB * 114) / 255000;
+  }
+
   if (includeDensity) {
     const scanArea = (maxX - minX + 1) * (maxY - minY + 1);
     if (scanArea === 0) {
