@@ -1,6 +1,6 @@
 {
   "name": "react-logo-soup",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "A tiny React library that makes logos look good together",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,8 +14,7 @@
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target browser --format esm --sourcemap=external --external react --external react-dom && bun build src/index.ts --outfile dist/index.cjs --target browser --format cjs --sourcemap=inline --external react --external react-dom && bun run build:types",
