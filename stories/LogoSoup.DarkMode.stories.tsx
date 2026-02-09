@@ -44,10 +44,18 @@ function SideBySide({ count, shuffleSeed, ...rest }: StoryArgs) {
   return (
     <>
       <div style={{ background: "#ffffff", padding: 16, borderRadius: 8 }}>
-        <StoryLogoSoup logos={originals} {...rest} />
+        <StoryLogoSoup
+          logos={originals}
+          backgroundColor={[255, 255, 255]}
+          {...rest}
+        />
       </div>
       <div style={{ background: "#1a1a1a", padding: 16, borderRadius: 8 }}>
-        <StoryLogoSoup logos={inverted} {...rest} />
+        <StoryLogoSoup
+          logos={inverted}
+          backgroundColor={[26, 26, 26]}
+          {...rest}
+        />
       </div>
     </>
   );
