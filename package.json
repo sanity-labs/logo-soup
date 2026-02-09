@@ -22,7 +22,7 @@
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist",
     "generate:logos": "bun scripts/generate-test-logos.ts",
     "prepublishOnly": "bun run build",
-    "test": "bun test",
+    "test": "NODE_ENV=development bun test",
     "bench": "bun tests/bench/run.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
@@ -56,16 +56,16 @@
     "@storybook/test": "^8",
     "@testing-library/react": "^16",
     "@types/bun": "latest",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "react": "^18",
-    "react-dom": "^18",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "react": "^19",
+    "react-dom": "^19",
     "storybook": "^8",
     "vite": "^5"
   },
   "peerDependencies": {
-    "react": "^18",
-    "react-dom": "^18",
+    "react": "^18 || ^19",
+    "react-dom": "^18 || ^19",
     "typescript": "^5"
   }
 }
