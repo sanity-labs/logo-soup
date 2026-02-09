@@ -5,11 +5,7 @@ function rgba(r: number, g: number, b: number, a: number): number {
   return ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
 }
 
-function fillGrid(
-  sw: number,
-  sh: number,
-  fill: number,
-): Uint32Array {
+function fillGrid(sw: number, sh: number, fill: number): Uint32Array {
   const data = new Uint32Array(sw * sh);
   data.fill(fill);
   return data;
@@ -22,7 +18,6 @@ describe("analyzePerimeter", () => {
     const transparent = rgba(0, 0, 0, 0);
     const opaque = rgba(255, 0, 0, 255);
     const data = fillGrid(sw, sh, transparent);
-    // place some opaque content in the center only
     data[12] = opaque;
 
     const result = analyzePerimeter(data, sw, sh);
@@ -35,7 +30,6 @@ describe("analyzePerimeter", () => {
     const white = rgba(255, 255, 255, 255);
     const red = rgba(255, 0, 0, 255);
     const data = fillGrid(sw, sh, white);
-    // paint a red block in the interior (never touches edges)
     for (let y = 3; y < 7; y++) {
       for (let x = 3; x < 7; x++) {
         data[y * sw + x] = red;
@@ -71,14 +65,12 @@ describe("analyzePerimeter", () => {
     const blue = rgba(0, 100, 200, 255);
     const yellow = rgba(255, 220, 0, 255);
     const data = fillGrid(sw, sh, blue);
-    // logo color covers the entire right edge
     for (let y = 0; y < sh; y++) {
       data[y * sw + (sw - 1)] = yellow;
     }
 
     const result = analyzePerimeter(data, sw, sh);
     expect(result.transparent).toBe(false);
-    // blue dominates top, bottom, and left edges
     expect(result.bgR).toBeLessThan(30);
     expect(result.bgG).toBeGreaterThan(80);
     expect(result.bgB).toBeGreaterThan(170);

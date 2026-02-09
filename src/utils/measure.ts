@@ -104,71 +104,75 @@ interface PerimeterAnalysis {
   bgB: number;
 }
 
+const SHIFT = 5;
+const LEVELS = 1 << (8 - SHIFT);
+const BUCKET_COUNT = LEVELS * LEVELS * LEVELS;
+
+const _bucketCounts = new Uint16Array(BUCKET_COUNT);
+const _bucketR = new Uint32Array(BUCKET_COUNT);
+const _bucketG = new Uint32Array(BUCKET_COUNT);
+const _bucketB = new Uint32Array(BUCKET_COUNT);
+
 export function analyzePerimeter(
   data32: Uint32Array,
   sw: number,
   sh: number,
 ): PerimeterAnalysis {
-  const SHIFT = 5;
-  const LEVELS = 1 << (8 - SHIFT);
-  const buckets = new Map<
-    number,
-    { r: number; g: number; b: number; count: number }
-  >();
+  _bucketCounts.fill(0);
+  _bucketR.fill(0);
+  _bucketG.fill(0);
+  _bucketB.fill(0);
 
   let opaqueCount = 0;
   let transparentCount = 0;
 
-  function sample(i: number) {
-    const pixel = data32[i]!;
-    const a = pixel >>> 24;
+  const lastRow = (sh - 1) * sw;
+  const lastCol = sw - 1;
 
+  for (let x = 0; x < sw; x++) {
+    samplePixel(data32[x]!);
+    if (sh > 1) samplePixel(data32[lastRow + x]!);
+  }
+  for (let y = 1; y < sh - 1; y++) {
+    const row = y * sw;
+    samplePixel(data32[row]!);
+    if (sw > 1) samplePixel(data32[row + lastCol]!);
+  }
+
+  function samplePixel(pixel: number) {
+    const a = pixel >>> 24;
     if (a < 128) {
       transparentCount++;
       return;
     }
-
     opaqueCount++;
     const r = pixel & 0xff;
     const g = (pixel >>> 8) & 0xff;
     const b = (pixel >>> 16) & 0xff;
     const key =
       ((r >>> SHIFT) * LEVELS + (g >>> SHIFT)) * LEVELS + (b >>> SHIFT);
-    const bucket = buckets.get(key);
-    if (bucket) {
-      bucket.r += r;
-      bucket.g += g;
-      bucket.b += b;
-      bucket.count++;
-    } else {
-      buckets.set(key, { r, g, b, count: 1 });
-    }
-  }
-
-  for (let x = 0; x < sw; x++) {
-    sample(x);
-    if (sh > 1) sample((sh - 1) * sw + x);
-  }
-  for (let y = 1; y < sh - 1; y++) {
-    sample(y * sw);
-    if (sw > 1) sample(y * sw + sw - 1);
+    _bucketCounts[key]!++;
+    _bucketR[key]! += r;
+    _bucketG[key]! += g;
+    _bucketB[key]! += b;
   }
 
   const totalPerimeter = opaqueCount + transparentCount;
   const transparent =
     totalPerimeter > 0 && transparentCount > totalPerimeter * 0.1;
 
-  let bestBucket: { r: number; g: number; b: number; count: number } | null =
-    null;
-  for (const bucket of buckets.values()) {
-    if (!bestBucket || bucket.count > bestBucket.count) {
-      bestBucket = bucket;
+  let bestCount = 0;
+  let bestIdx = 0;
+  for (let i = 0; i < BUCKET_COUNT; i++) {
+    if (_bucketCounts[i]! > bestCount) {
+      bestCount = _bucketCounts[i]!;
+      bestIdx = i;
     }
   }
 
-  const bgR = bestBucket ? Math.round(bestBucket.r / bestBucket.count) : 255;
-  const bgG = bestBucket ? Math.round(bestBucket.g / bestBucket.count) : 255;
-  const bgB = bestBucket ? Math.round(bestBucket.b / bestBucket.count) : 255;
+  const bgR = bestCount ? Math.round(_bucketR[bestIdx]! / bestCount) : 255;
+  const bgG = bestCount ? Math.round(_bucketG[bestIdx]! / bestCount) : 255;
+  const bgB = bestCount ? Math.round(_bucketB[bestIdx]! / bestCount) : 255;
 
   return { transparent, bgR, bgG, bgB };
 }
