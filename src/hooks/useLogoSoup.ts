@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import {
   DEFAULT_BASE_SIZE,
   DEFAULT_CONTRAST_THRESHOLD,
@@ -18,6 +18,7 @@ import {
   cropToBlobUrl,
   loadImage,
   measureWithContentDetection,
+  resolveBackgroundColor,
 } from "../utils/measure";
 import {
   createNormalizedLogo,
@@ -91,7 +92,16 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     densityAware = DEFAULT_DENSITY_AWARE,
     densityFactor = DEFAULT_DENSITY_FACTOR,
     cropToContent = DEFAULT_CROP_TO_CONTENT,
+    backgroundColor: backgroundColorProp,
   } = options;
+
+  const resolvedBg = useMemo(
+    () =>
+      backgroundColorProp
+        ? resolveBackgroundColor(backgroundColorProp)
+        : undefined,
+    [backgroundColorProp],
+  );
 
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
@@ -105,6 +115,7 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
   const cacheKeyRef = useRef({
     contrastThreshold: NaN,
     densityAware: false,
+    resolvedBg: undefined as [number, number, number] | undefined,
   });
 
   useEffect(() => {
@@ -120,12 +131,22 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     const cache = cacheRef.current;
     const prevKey = cacheKeyRef.current;
 
+    const bgChanged =
+      prevKey.resolvedBg?.[0] !== resolvedBg?.[0] ||
+      prevKey.resolvedBg?.[1] !== resolvedBg?.[1] ||
+      prevKey.resolvedBg?.[2] !== resolvedBg?.[2];
+
     if (
       prevKey.contrastThreshold !== contrastThreshold ||
-      prevKey.densityAware !== densityAware
+      prevKey.densityAware !== densityAware ||
+      bgChanged
     ) {
       clearCache(cache);
-      cacheKeyRef.current = { contrastThreshold, densityAware };
+      cacheKeyRef.current = {
+        contrastThreshold,
+        densityAware,
+        resolvedBg,
+      };
     }
 
     const sources: LogoSource[] = stableLogos.map(normalizeSource);
@@ -178,6 +199,7 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
             img,
             contrastThreshold,
             densityAware,
+            resolvedBg,
           );
           entry = { img, measurement };
           cache.set(source.src, entry);
@@ -244,6 +266,7 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     densityAware,
     densityFactor,
     cropToContent,
+    resolvedBg,
   ]);
 
   return {

@@ -1,5 +1,12 @@
 import type { CSSProperties, ImgHTMLAttributes, ReactNode } from "react";
 
+type HexColor = `#${string}`;
+type RGBFunction = `rgb(${string})` | `rgba(${string})`;
+type HSLFunction = `hsl(${string})` | `hsla(${string})`;
+type CSSColor = HexColor | RGBFunction | HSLFunction | (string & {});
+
+export type BackgroundColor = CSSColor | [number, number, number];
+
 export type AlignmentMode =
   | "bounds"
   | "visual-center"
@@ -65,6 +72,7 @@ export interface UseLogoSoupOptions {
   densityAware?: boolean;
   densityFactor?: number;
   cropToContent?: boolean;
+  backgroundColor?: BackgroundColor;
 }
 
 export interface UseLogoSoupResult {
@@ -82,6 +90,7 @@ export interface LogoSoupProps {
   densityAware?: boolean;
   densityFactor?: number;
   cropToContent?: boolean;
+  backgroundColor?: BackgroundColor;
   alignBy?: AlignmentMode;
   gap?: number | string;
   renderImage?: RenderImageFn;

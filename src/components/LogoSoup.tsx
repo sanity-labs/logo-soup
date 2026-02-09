@@ -27,6 +27,7 @@ export function LogoSoup({
   densityAware,
   densityFactor,
   cropToContent,
+  backgroundColor,
   alignBy = DEFAULT_ALIGN_BY,
   gap = DEFAULT_GAP,
   renderImage,
@@ -42,6 +43,7 @@ export function LogoSoup({
     densityAware,
     densityFactor,
     cropToContent,
+    backgroundColor,
   });
 
   const ImageComponent = renderImage || DefaultImage;

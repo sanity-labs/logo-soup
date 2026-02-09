@@ -20,6 +20,7 @@
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target browser --format esm --sourcemap=external --external react --external react-dom && bun build src/index.ts --outfile dist/index.cjs --target browser --format cjs --sourcemap=inline --external react --external react-dom && bun run build:types",
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist",
+    "generate:logos": "bun scripts/generate-test-logos.ts",
     "prepublishOnly": "bun run build",
     "test": "bun test",
     "bench": "bun tests/bench/run.ts",
