@@ -1,6 +1,6 @@
 {
   "name": "react-logo-soup",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A tiny React library that makes logos look good together",
   "type": "module",
   "main": "./dist/index.js",
