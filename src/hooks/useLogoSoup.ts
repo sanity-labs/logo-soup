@@ -91,6 +91,7 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     densityAware = DEFAULT_DENSITY_AWARE,
     densityFactor = DEFAULT_DENSITY_FACTOR,
     cropToContent = DEFAULT_CROP_TO_CONTENT,
+    backgroundColor,
   } = options;
 
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
@@ -105,6 +106,7 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
   const cacheKeyRef = useRef({
     contrastThreshold: NaN,
     densityAware: false,
+    backgroundColor: undefined as [number, number, number] | undefined,
   });
 
   useEffect(() => {
@@ -120,12 +122,22 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     const cache = cacheRef.current;
     const prevKey = cacheKeyRef.current;
 
+    const bgChanged =
+      prevKey.backgroundColor?.[0] !== backgroundColor?.[0] ||
+      prevKey.backgroundColor?.[1] !== backgroundColor?.[1] ||
+      prevKey.backgroundColor?.[2] !== backgroundColor?.[2];
+
     if (
       prevKey.contrastThreshold !== contrastThreshold ||
-      prevKey.densityAware !== densityAware
+      prevKey.densityAware !== densityAware ||
+      bgChanged
     ) {
       clearCache(cache);
-      cacheKeyRef.current = { contrastThreshold, densityAware };
+      cacheKeyRef.current = {
+        contrastThreshold,
+        densityAware,
+        backgroundColor,
+      };
     }
 
     const sources: LogoSource[] = stableLogos.map(normalizeSource);
@@ -178,6 +190,7 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
             img,
             contrastThreshold,
             densityAware,
+            backgroundColor,
           );
           entry = { img, measurement };
           cache.set(source.src, entry);
@@ -244,6 +257,7 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     densityAware,
     densityFactor,
     cropToContent,
+    backgroundColor,
   ]);
 
   return {

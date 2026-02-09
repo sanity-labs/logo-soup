@@ -65,6 +65,7 @@ export interface UseLogoSoupOptions {
   densityAware?: boolean;
   densityFactor?: number;
   cropToContent?: boolean;
+  backgroundColor?: [number, number, number];
 }
 
 export interface UseLogoSoupResult {
@@ -82,6 +83,7 @@ export interface LogoSoupProps {
   densityAware?: boolean;
   densityFactor?: number;
   cropToContent?: boolean;
+  backgroundColor?: [number, number, number];
   alignBy?: AlignmentMode;
   gap?: number | string;
   renderImage?: RenderImageFn;
