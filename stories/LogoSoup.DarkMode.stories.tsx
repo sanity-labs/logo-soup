@@ -18,7 +18,7 @@ function InvertedSVGs({ count, shuffleSeed, ...rest }: StoryArgs) {
   }, [count, shuffleSeed]);
 
   return (
-    <div style={{ background: "#1a1a1a", padding: 16, borderRadius: 8 }}>
+    <div style={{ background: "#0a0a0a", padding: 16, borderRadius: 8 }}>
       <StoryLogoSoup logos={logos} {...rest} />
     </div>
   );
@@ -44,10 +44,10 @@ function SideBySide({ count, shuffleSeed, ...rest }: StoryArgs) {
   return (
     <>
       <div style={{ background: "#ffffff", padding: 16, borderRadius: 8 }}>
-        <StoryLogoSoup logos={originals} {...rest} />
+        <StoryLogoSoup logos={originals} backgroundColor="#ffffff" {...rest} />
       </div>
-      <div style={{ background: "#1a1a1a", padding: 16, borderRadius: 8 }}>
-        <StoryLogoSoup logos={inverted} {...rest} />
+      <div style={{ background: "#0a0a0a", padding: 16, borderRadius: 8 }}>
+        <StoryLogoSoup logos={inverted} backgroundColor="#0a0a0a" {...rest} />
       </div>
     </>
   );
