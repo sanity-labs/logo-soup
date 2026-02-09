@@ -51,13 +51,20 @@ export function calculateNormalizedDimensions(
   let normalizedHeight = normalizedWidth / aspectRatio;
 
   // Irradiation compensation: light content on dark backgrounds appears
-  // larger due to optical illusion. Scale down proportionally to how dark
-  // the detected background is. Only applies to opaque images where
+  // larger/bolder due to the optical irradiation illusion. The effect is
+  // more pronounced on dense/bold logos (more surface area "blooms") and
+  // at higher contrast (darker backgrounds). Scale down proportionally
+  // to darkness × density. Only applies to opaque images where
   // backgroundLuminance is available (transparent images are unaffected).
+  //
+  // References:
+  // - Helmholtz irradiation illusion (1860s)
+  // - https://gist.github.com/janogarcia/e9f57cd18ca85756743f81d9692764b7
+  // - https://nerdy.dev/adjust-perceived-typepace-weight-for-dark-mode-without-layout-shift
   if (measurement.backgroundLuminance !== undefined) {
-    const maxCompensation = 0.05;
-    const irradiationScale =
-      1 - (1 - measurement.backgroundLuminance) * maxCompensation;
+    const darkness = 1 - measurement.backgroundLuminance;
+    const density = measurement.pixelDensity ?? 0.5;
+    const irradiationScale = 1 - darkness * density * 0.08;
     normalizedWidth *= irradiationScale;
     normalizedHeight *= irradiationScale;
   }
