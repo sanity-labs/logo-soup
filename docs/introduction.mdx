@@ -8,32 +8,14 @@ description: A tiny framework-agnostic library that makes logos look good togeth
 Real-world logos are messy. Some have padding, some don't. Some are dense and blocky, others are thin and airy. Put them in a row and they look chaotic.
 
 <Frame>
-  <img
-    src="/images/before.png"
-    alt="Logos without normalization — different sizes, weights, and aspect ratios create visual chaos"
-  />
+  <img src="/images/before.png" alt="Logos without normalization — different sizes, weights, and aspect ratios create visual chaos" />
 </Frame>
 
 Logo Soup fixes this automatically.
 
 <Frame>
-  <img
-    src="/images/after.png"
-    alt="After normalization — the same logos appear balanced and harmonious"
-  />
+  <img src="/images/after.png" alt="After normalization — the same logos appear balanced and harmonious" />
 </Frame>
-
-## Try it
-
-<iframe
-  src="https://logo-soup.sanity.dev/?path=/story/logosoup--default&full=1&shortcuts=false&singleStory=true"
-  style={{
-    width: "100%",
-    height: "500px",
-    border: "1px solid #e5e7eb",
-    borderRadius: "8px",
-  }}
-/>
 
 ## What it does
 
@@ -85,7 +67,5 @@ The library is built around a framework-agnostic core engine (`createLogoSoup`) 
 Tree-shaking ensures a React consumer never pulls in Vue/Svelte/Solid/Angular code, and vice versa.
 
 <Info>
-  Read the full deep-dive on the problem and the math behind the solution: [The
-  Logo Soup Problem (and how to solve
-  it)](https://www.sanity.io/blog/the-logo-soup-problem)
+  Read the full deep-dive on the problem and the math behind the solution: [The Logo Soup Problem (and how to solve it)](https://www.sanity.io/blog/the-logo-soup-problem)
 </Info>
