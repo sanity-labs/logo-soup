@@ -27,39 +27,33 @@
     }
   },
   "navigation": {
-    "dropdowns": [
+    "groups": [
       {
-        "dropdown": "Documentation",
-        "icon": "book",
+        "group": "Get Started",
+        "pages": ["introduction", "quickstart"]
+      },
+      {
+        "group": "Frameworks",
         "pages": [
-          {
-            "group": "Get Started",
-            "pages": ["introduction", "quickstart"]
-          },
-          {
-            "group": "Frameworks",
-            "pages": [
-              "frameworks/react",
-              "frameworks/vue",
-              "frameworks/svelte",
-              "frameworks/solid",
-              "frameworks/angular",
-              "frameworks/jquery",
-              "frameworks/vanilla",
-              "frameworks/custom"
-            ]
-          },
-          {
-            "group": "Guides",
-            "pages": ["options", "how-it-works"]
-          },
-          {
-            "group": "Reference",
-            "pages": [
-              "api-reference/create-logo-soup",
-              "api-reference/get-visual-center-transform"
-            ]
-          }
+          "frameworks/react",
+          "frameworks/vue",
+          "frameworks/svelte",
+          "frameworks/solid",
+          "frameworks/angular",
+          "frameworks/jquery",
+          "frameworks/vanilla",
+          "frameworks/custom"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": ["options", "how-it-works"]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "api-reference/create-logo-soup",
+          "api-reference/get-visual-center-transform"
         ]
       }
     ]
