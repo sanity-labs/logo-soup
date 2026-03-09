@@ -30,7 +30,7 @@ export const LogoSoupDemo = () => {
   const displayScale = 0.8;
 
   const [on, setOn] = useState(true);
-  const [count, setCount] = useState(10);
+  const [count, setCount] = useState(12);
 
   return (
     <div className="not-prose">
