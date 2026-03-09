@@ -41,7 +41,7 @@ Works with React, Vue, Svelte, Solid, Angular, jQuery, and vanilla JavaScript.
 ## Resources
 
 - 📖 [Documentation](https://logo-soup.sanity.dev/docs) — Full API reference, framework guides, and options
-- 🎨 [Storybook](https://logo-soup.sanity.dev) — Interactive playground with real logos and tunable parameters
+- 🎨 [Storybook](https://logo-soup.sanity.dev/?path=/story/logosoup--default) — Interactive playground with real logos and tunable parameters
 - 📝 [The Logo Soup Problem](https://www.sanity.io/blog/the-logo-soup-problem) — Deep-dive blog post on the problem and the math behind the solution
 
 ## Development
