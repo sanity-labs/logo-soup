@@ -47,15 +47,9 @@ jobs:
           node-version: lts/*
           registry-url: https://registry.npmjs.org
 
-      - name: Update npm for trusted publishing (OIDC)
-        run: npm install -g npm@latest
-
       - run: bun install --frozen-lockfile
 
       - run: bun run build
-
-      - name: Authenticate with npm
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
@@ -66,4 +60,5 @@ jobs:
           setupGitUser: false
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
