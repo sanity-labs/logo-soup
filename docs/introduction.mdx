@@ -55,6 +55,7 @@ The library is built around a framework-agnostic core engine (`createLogoSoup`) 
 @sanity-labs/logo-soup/svelte   → createLogoSoup (runes-compatible)
 @sanity-labs/logo-soup/solid    → useLogoSoup primitive
 @sanity-labs/logo-soup/angular  → LogoSoupService (Injectable)
+@sanity-labs/logo-soup/node     → measureImage / measureImages (server-side)
 ```
 
-Tree-shaking ensures a React consumer never pulls in Vue/Svelte/Solid/Angular code, and vice versa. Need a framework we don't support? [Build your own adapter](/frameworks/custom) in 20–40 lines.
+Tree-shaking ensures a React consumer never pulls in Vue/Svelte/Solid/Angular code, and vice versa. The [Node.js adapter](/frameworks/node) lets you pre-compute measurements at build time or in API routes, so clients skip all canvas work. Need a framework we don't support? [Build your own adapter](/frameworks/custom) in 20–40 lines.

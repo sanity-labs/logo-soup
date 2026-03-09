@@ -1,0 +1,167 @@
+---
+title: Node.js
+description: Pre-compute logo measurements server-side with the Node.js adapter.
+---
+
+## Install
+
+```bash
+npm install @sanity-labs/logo-soup @napi-rs/canvas
+```
+
+`@napi-rs/canvas` is a peer dependency — it provides the Skia-backed canvas used for pixel analysis on Node. Zero system dependencies.
+
+## Why pre-compute?
+
+Logo Soup normally runs client-side on a `<canvas>`. That's fine for most cases, but sometimes you want to skip the client-side pixel scanning entirely:
+
+- **Static sites / build-time optimization** — measure logos once at build time, ship the results as JSON
+- **SSR / API routes** — compute measurements on the server so the client renders instantly with no layout shift
+- **Large logo sets** — offload the work from the browser for 50+ logos
+
+The Node adapter runs the exact same measurement pipeline as the browser (same downsampling, same single-pass pixel scan, same normalization math), just using `@napi-rs/canvas` instead of an `HTMLCanvasElement`.
+
+## measureImage
+
+Measure a single image. Accepts a file path, URL, or Buffer.
+
+```ts
+import { measureImage } from "@sanity-labs/logo-soup/node";
+
+const result = await measureImage("./logos/acme.svg");
+```
+
+### Parameters
+
+<ParamField path="source" type="string | Buffer" required>
+  A file path, HTTP URL, or Buffer containing image data. Supports PNG, JPEG, SVG, WebP, and any format `@napi-rs/canvas` can decode.
+</ParamField>
+
+<ParamField path="options" type="MeasureOptions">
+  | Option | Type | Default | Description |
+  | --- | --- | --- | --- |
+  | `contrastThreshold` | `number` | `10` | Minimum contrast distance to classify a pixel as content |
+  | `densityAware` | `boolean` | `true` | Whether to compute pixel density |
+  | `backgroundColor` | `[number, number, number]` | auto-detected | Explicit RGB background color, skips perimeter detection |
+</ParamField>
+
+### Returns
+
+`Promise<MeasurementResult>` — the same type returned by the browser engine's content detection:
+
+```ts
+type MeasurementResult = {
+  width: number;
+  height: number;
+  contentBox?: BoundingBox;
+  pixelDensity?: number;
+  visualCenter?: VisualCenter;
+  backgroundLuminance?: number;
+};
+```
+
+## measureImages
+
+Measure multiple images in parallel. Returns results in the same order as the input array.
+
+```ts
+import { measureImages } from "@sanity-labs/logo-soup/node";
+
+const results = await measureImages([
+  "./logos/acme.svg",
+  "./logos/globex.svg",
+  "./logos/initech.svg",
+]);
+```
+
+## Build-time workflow
+
+The typical workflow is: measure on the server, serialize the results, and use them on the client to skip all canvas work.
+
+### 1. Measure at build time
+
+```ts
+// scripts/measure-logos.ts
+import { writeFile } from "node:fs/promises";
+import { measureImages } from "@sanity-labs/logo-soup/node";
+
+const logos = [
+  "./public/logos/acme.svg",
+  "./public/logos/globex.svg",
+  "./public/logos/initech.svg",
+];
+
+const measurements = await measureImages(logos);
+
+await writeFile(
+  "./src/logo-measurements.json",
+  JSON.stringify(measurements),
+);
+```
+
+### 2. Use on the client
+
+```tsx
+import { createNormalizedLogo, getVisualCenterTransform } from "@sanity-labs/logo-soup";
+import measurements from "./logo-measurements.json";
+
+const logos = [
+  { src: "/logos/acme.svg", alt: "Acme" },
+  { src: "/logos/globex.svg", alt: "Globex" },
+  { src: "/logos/initech.svg", alt: "Initech" },
+];
+
+// Pure math, no canvas, no async — instant
+const normalized = logos.map((logo, i) =>
+  createNormalizedLogo(logo, measurements[i], 48, 0.5, 0.5),
+);
+```
+
+The client never loads a canvas, never scans pixels, and never waits for image loads before knowing the layout dimensions. The `createNormalizedLogo` and `getVisualCenterTransform` functions are pure math that work anywhere.
+
+## API route example
+
+The same approach works at request time in a server framework:
+
+```ts
+// Next.js API route (app router)
+import { measureImage, createNormalizedLogo } from "@sanity-labs/logo-soup/node";
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const src = searchParams.get("src");
+
+  const measurement = await measureImage(src);
+  const normalized = createNormalizedLogo(
+    { src, alt: "" },
+    measurement,
+    48, 0.5, 0.5,
+  );
+
+  return Response.json(normalized);
+}
+```
+
+## Re-exported utilities
+
+The Node adapter re-exports the pure math functions you need to go from `MeasurementResult` to rendered output, so you don't need to import from the core entry point:
+
+| Export | Description |
+| --- | --- |
+| `calculateNormalizedDimensions` | Compute normalized width/height from a `MeasurementResult` |
+| `createNormalizedLogo` | Build a full `NormalizedLogo` object from a source and measurement |
+| `getVisualCenterTransform` | Compute a CSS `translate()` for visual center alignment |
+| `MeasurementResult` | TypeScript type for measurement data |
+
+## Differences from the browser engine
+
+| Concern | Browser (`createLogoSoup`) | Node (`measureImage`) |
+| --- | --- | --- |
+| Canvas backend | `HTMLCanvasElement` | `@napi-rs/canvas` (Skia) |
+| Image loading | `new Image()` with `onload` | `@napi-rs/canvas` `loadImage()` (file path, URL, or Buffer) |
+| Caching | Automatic by URL, invalidated on option change | None — stateless, cache yourself |
+| Cancellation | Built-in (latest `process()` wins) | Not applicable — use `AbortController` upstream |
+| Reactivity | `subscribe`/`getSnapshot` for framework adapters | Returns a `Promise` — wire into your server framework however you like |
+| Pixel math | Shared `measureContent` pipeline | Same shared `measureContent` pipeline |
+
+The measurement results are identical. Both paths downsample to ~2,048 pixels and run the same single-pass scan.

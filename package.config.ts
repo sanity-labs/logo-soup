@@ -18,5 +18,6 @@ export default defineConfig({
     "solid-js",
     "@angular/core",
     "jquery",
+    "@napi-rs/canvas",
   ],
 });

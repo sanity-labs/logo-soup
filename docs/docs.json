@@ -41,6 +41,7 @@
           "frameworks/solid",
           "frameworks/angular",
           "frameworks/jquery",
+          "frameworks/node",
           "frameworks/vanilla",
           "frameworks/custom"
         ]
