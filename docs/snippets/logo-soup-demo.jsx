@@ -42,6 +42,7 @@ export const LogoSoupDemo = () => {
               src={`${base}/${name}.svg`}
               alt={name}
               draggable={false}
+              className="dark:invert"
               style={{
                 width: on
                   ? `${dw * displayScale}px`
