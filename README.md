@@ -4,7 +4,11 @@
 
 A tiny framework-agnostic library that makes logos look good together.
 
+### Before
+
 ![Logos without normalization — different sizes, weights, and aspect ratios create visual chaos](static/docs/before.png)
+
+### After
 
 ![After normalization — the same logos appear balanced and harmonious](static/docs/after.png)
 
