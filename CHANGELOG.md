@@ -1,5 +1,11 @@
 # @sanity-labs/logo-soup
 
+## 1.2.0
+
+### Minor Changes
+
+- [#37](https://github.com/sanity-labs/logo-soup/pull/37) [`2474d14`](https://github.com/sanity-labs/logo-soup/commit/2474d14190558c735b2dbdc59aea533eba4bfa61) Thanks [@RostiMelk](https://github.com/RostiMelk)! - Add Node.js adapter (`@sanity-labs/logo-soup/node`) for server-side logo measurement using `@napi-rs/canvas`. Extract shared pixel math into `measureContent` pipeline used by both browser and Node paths. Includes `measureImage`, `measureImages`, and re-exports of `createNormalizedLogo`, `calculateNormalizedDimensions`, and `getVisualCenterTransform` with all supporting types.
+
 ## 1.1.0
 
 ### Minor Changes
