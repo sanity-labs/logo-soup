@@ -58,6 +58,11 @@
       }
     ]
   },
+  "seo": {
+    "metatags": {
+      "canonical": "https://logo-soup.sanity.dev/docs"
+    }
+  },
   "footer": {
     "socials": {
       "github": "https://github.com/sanity-labs/logo-soup"
