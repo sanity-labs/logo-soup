@@ -89,7 +89,9 @@
     "test": "NODE_ENV=development bun test",
     "bench": "bun tests/bench/run.ts",
     "storybook": "storybook dev -p 6006",
-    "storybook:build": "storybook build"
+    "storybook:build": "storybook build",
+    "docs": "cd docs && mint dev",
+    "docs:build": "cd docs && mint build"
   },
   "repository": {
     "type": "git",

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Logo Soup",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://github.com/sanity-labs/logo-soup"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#f36458",
+    "light": "#ff8a7a",
+    "dark": "#d44a3e"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/sanity-labs/logo-soup"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "npm",
+      "href": "https://www.npmjs.com/package/@sanity-labs/logo-soup"
+    }
+  },
+  "navigation": {
+    "dropdowns": [
+      {
+        "dropdown": "Documentation",
+        "icon": "book",
+        "pages": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Frameworks",
+            "pages": [
+              "frameworks/react",
+              "frameworks/vue",
+              "frameworks/svelte",
+              "frameworks/solid",
+              "frameworks/angular",
+              "frameworks/jquery",
+              "frameworks/vanilla",
+              "frameworks/custom"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": ["options", "how-it-works"]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "api-reference/create-logo-soup",
+              "api-reference/get-visual-center-transform"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/sanity-labs/logo-soup"
+    }
+  }
+}
