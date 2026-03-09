@@ -10,8 +10,9 @@
     "moduleResolution": "bundler",
     "verbatimModuleSyntax": true,
     "declaration": true,
-    "emitDeclarationOnly": true,
+    "rootDir": ".",
     "outDir": "dist",
+    "noEmit": true,
 
     "strict": true,
     "skipLibCheck": true,
@@ -21,8 +22,8 @@
 
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["./package.config.ts", "./src"],
+  "exclude": ["node_modules", "dist"],
 }

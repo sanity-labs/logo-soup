@@ -1,0 +1,151 @@
+---
+title: How It Works
+description: Content detection, normalization math, density compensation, and irradiation correction explained.
+---
+
+Logo Soup processes each logo through four stages, all running client-side on a `<canvas>` element. No server, no AI, fully deterministic.
+
+## 1. Content Detection
+
+Most logos have invisible padding, transparent borders, or solid-color backgrounds baked into the image file. Before normalizing sizes, Logo Soup needs to find where the actual content is.
+
+### The process
+
+1. The image is drawn onto an off-screen canvas, downscaled to a pixel budget of ~2,048 pixels (for performance)
+2. The perimeter pixels are analyzed to determine the background — either transparent or the dominant color along the edges
+3. Every pixel is then classified as "content" or "background" based on contrast distance from the detected background
+
+### Transparent vs opaque backgrounds
+
+- **Transparent logos** (PNGs/SVGs with alpha): pixels with alpha below the `contrastThreshold` are ignored. Content is everything with meaningful opacity.
+- **Opaque logos** (JPEGs, logos on solid backgrounds): the engine samples the image perimeter using a color histogram (quantized to 8-level buckets) to find the dominant background color. Pixels within `contrastThreshold` RGB distance of this color are treated as background.
+
+You can override the auto-detection by providing `backgroundColor` explicitly, which is recommended for opaque logos on known backgrounds.
+
+### Output
+
+Content detection produces a `contentBox` (the tight bounding rectangle around all detected content pixels) and a `visualCenter` (the weighted center of mass of all content pixels).
+
+## 2. Aspect Ratio Normalization
+
+This is the core of the "logo soup" problem. Given a set of logos with wildly different aspect ratios, how do you make them look balanced together?
+
+Logo Soup uses [Dan Paquette's technique](https://www.sanity.io/blog/the-logo-soup-problem):
+
+```
+normalizedWidth = aspectRatio ^ scaleFactor × baseSize
+```
+
+The `scaleFactor` parameter controls the balance between width uniformity and height uniformity:
+
+| `scaleFactor` | Effect | Math |
+| --- | --- | --- |
+| `0` | All logos get the same width (`baseSize`) | `ratio^0 = 1`, so `width = baseSize` for all |
+| `1` | All logos get the same height (`baseSize`) | `ratio^1 × baseSize / ratio = baseSize` for all |
+| `0.5` | Balanced — neither too wide nor too tall | Square root dampens extreme ratios |
+
+The default `0.5` works well for most logo sets. It's the geometric mean between uniform-width and uniform-height, producing visually balanced results regardless of whether your set has more wide or tall logos.
+
+### Content box awareness
+
+Normalization uses the `contentBox` dimensions (not the original image dimensions) when available. This means padding baked into image files doesn't affect the computed size.
+
+## 3. Density Compensation
+
+Even after size normalization, logos can look unbalanced because of differences in visual weight. A dense, solid wordmark (like "SAMSUNG") looks heavier than a thin, airy logo (like the Nike swoosh) at the same pixel dimensions.
+
+### Measuring density
+
+During content detection, the engine also computes a `pixelDensity` value (0 to 1) for each logo:
+
+```
+pixelDensity = coverageRatio × averageOpacity
+```
+
+Where:
+- `coverageRatio` = fraction of pixels within the content box that are classified as content
+- `averageOpacity` = average opacity of those content pixels (normalized 0–1)
+
+A solid, blocky logo has high coverage and high opacity → high density. A thin logo with lots of whitespace has low coverage → low density.
+
+### Applying compensation
+
+The density compensation scales logos inversely to their density:
+
+```
+densityScale = (1 / (pixelDensity / referenceDensity)) ^ (densityFactor × 0.5)
+```
+
+The `referenceDensity` is `0.35` (a typical logo density). Logos denser than this get scaled down; lighter logos get scaled up. The scale is clamped to 0.5×–2× to prevent extreme adjustments.
+
+The `densityFactor` option (default `0.5`) controls how strongly this affects the result. Set it to `0` to disable, or increase toward `1` for stronger compensation.
+
+## 4. Irradiation Compensation
+
+The [Helmholtz irradiation illusion](https://en.wikipedia.org/wiki/Irradiation_illusion) is an optical effect where light content on dark backgrounds appears larger and bolder than it actually is. This matters when displaying logos in dark mode.
+
+### The effect
+
+A white logo on a black background "blooms" — it appears to take up more visual space than the same logo in black on white. The effect is stronger for:
+
+- **Darker backgrounds** (higher contrast)
+- **Denser logos** (more surface area to "bloom")
+
+### The correction
+
+When `backgroundColor` is provided (or auto-detected from opaque images), the engine computes a `backgroundLuminance` value and applies a small scale-down:
+
+```
+irradiationScale = 1 - darkness × density × 0.08
+```
+
+Where `darkness = 1 - backgroundLuminance` and `density` is the logo's pixel density.
+
+This is a subtle effect (typically 1–4% reduction), but it measurably improves visual balance in dark mode. It only applies to opaque images where the background luminance can be determined — transparent logos are unaffected.
+
+<Info>
+  References:
+  - [Helmholtz irradiation illusion (1860s)](https://en.wikipedia.org/wiki/Irradiation_illusion)
+  - [Jano Garcia's research compilation](https://gist.github.com/janogarcia/e9f57cd18ca85756743f81d9692764b7)
+  - [Adam Argyle: Adjust perceived typeface weight for dark mode](https://nerdy.dev/adjust-perceived-typepace-weight-for-dark-mode-without-layout-shift)
+</Info>
+
+## 5. Visual Center Alignment
+
+After normalization, logos can still appear misaligned because their visual weight isn't centered. Consider a logo like the Airbnb symbol — the geometric center of the bounding box isn't where your eye perceives the center to be.
+
+### Computing the visual center
+
+During content detection, the engine computes a weighted center of mass across all content pixels. Each pixel's weight is proportional to its contrast distance from the background (or its alpha for transparent logos). This gives more influence to high-contrast, visually prominent pixels.
+
+The result is a `visualCenter` with `offsetX` and `offsetY` values representing the displacement from the geometric center of the content box.
+
+### Applying alignment
+
+The `getVisualCenterTransform` helper computes a CSS `translate()` that compensates for this offset:
+
+```ts
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+const transform = getVisualCenterTransform(logo, "visual-center-y");
+// Returns "translate(0px, -2.3px)" or undefined
+```
+
+The `alignBy` modes control which axes are compensated:
+
+- `"bounds"` — No compensation, align by geometric center
+- `"visual-center"` — Compensate on both X and Y
+- `"visual-center-x"` — Compensate horizontally only
+- `"visual-center-y"` — Compensate vertically only (default)
+
+The default `"visual-center-y"` is best for horizontal logo rows where vertical balance matters most. Horizontal offsets are usually less noticeable because logos have natural spacing between them.
+
+## Performance
+
+All processing happens on the client using an off-screen `<canvas>` element. Key optimizations:
+
+- **Downscaling**: Images are drawn at ~2,048 total pixels regardless of source resolution. A 2000×1000 image is analyzed at ~45×23 pixels. This makes measurement O(1) relative to image resolution.
+- **Reusable canvases**: The engine maintains pooled canvas contexts to avoid repeated DOM allocation.
+- **Image caching**: Once an image is loaded and measured, the result is cached by URL. Re-processing with different `baseSize` or `scaleFactor` reuses cached measurements without network requests.
+- **Cancellation**: If `process()` is called while a previous run is still loading, the in-flight work is cancelled. Only the latest call's results are emitted.
+- **Blob URL management**: Cropped images use `URL.createObjectURL()` and are properly revoked on cache invalidation and engine destruction.

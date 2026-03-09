@@ -1,0 +1,269 @@
+---
+title: Options Reference
+description: All configuration options for Logo Soup, shared across every framework.
+---
+
+These options are shared across every framework adapter. They're passed as component props (React), composable args (Vue), or `process()` options (Svelte/Solid/Angular/Vanilla).
+
+## Core Options
+
+### `logos`
+
+<ParamField path="logos" type="(string | { src: string; alt?: string })[]" required>
+  Array of logo URLs or objects with `src` and optional `alt` text. Use objects to provide accessible alt text for each logo.
+
+  ```ts
+  // Plain strings
+  const logos = ["/logos/acme.svg", "/logos/globex.svg"];
+
+  // Objects with alt text (recommended)
+  const logos = [
+    { src: "/logos/acme.svg", alt: "Acme Corp" },
+    { src: "/logos/globex.svg", alt: "Globex" },
+  ];
+
+  // Mixed
+  const logos = [
+    "/logos/acme.svg",
+    { src: "/logos/globex.svg", alt: "Globex" },
+  ];
+  ```
+</ParamField>
+
+### `baseSize`
+
+<ParamField path="baseSize" type="number" default="48">
+  Target size for logos in pixels. This is the baseline that all normalization is relative to. Larger values produce larger logos.
+
+  ```tsx
+  <LogoSoup logos={logos} baseSize={64} />
+  ```
+</ParamField>
+
+### `scaleFactor`
+
+<ParamField path="scaleFactor" type="number" default="0.5">
+  Controls how logos with different aspect ratios are balanced. This uses [Dan Paquette's technique](https://www.sanity.io/blog/the-logo-soup-problem) where the normalized width is calculated as `aspectRatio ^ scaleFactor * baseSize`.
+
+  | Value | Behavior | When to use |
+  | --- | --- | --- |
+  | `0` | All logos get the same width | When you want a uniform grid |
+  | `0.5` | Balanced (default) | Most use cases |
+  | `1` | All logos get the same height | When vertical alignment matters most |
+
+  Imagine two logos: Logo A is wide (200×100) and Logo B is tall (100×200).
+
+  **`scaleFactor = 0`** — Same width for all:
+  - Logo A: 48×24 (short)
+  - Logo B: 48×96 (very tall)
+
+  **`scaleFactor = 1`** — Same height for all:
+  - Logo A: 96×48 (very wide)
+  - Logo B: 24×48 (narrow)
+
+  **`scaleFactor = 0.5`** — Balanced:
+  - Neither gets too wide nor too tall
+  - Looks most natural
+</ParamField>
+
+### `densityAware`
+
+<ParamField path="densityAware" type="boolean" default="true">
+  When enabled, Logo Soup measures the "visual weight" (pixel density) of each logo and adjusts sizing accordingly. Dense, solid logos get scaled down. Light, thin logos get scaled up.
+
+  Set to `false` to disable density compensation entirely.
+
+  ```tsx
+  // Disable density compensation
+  <LogoSoup logos={logos} densityAware={false} />
+  ```
+</ParamField>
+
+### `densityFactor`
+
+<ParamField path="densityFactor" type="number" default="0.5">
+  Controls how strongly density affects the result. Only applies when `densityAware` is `true`.
+
+  | Value | Effect |
+  | --- | --- |
+  | `0` | No density compensation (same as `densityAware: false`) |
+  | `0.5` | Moderate compensation (default) |
+  | `1` | Strong compensation |
+
+  ```tsx
+  // Stronger density compensation
+  <LogoSoup logos={logos} densityFactor={0.8} />
+  ```
+</ParamField>
+
+### `cropToContent`
+
+<ParamField path="cropToContent" type="boolean" default="false">
+  When enabled, logos are cropped to their detected content bounds and re-rendered as blob URLs. This removes any whitespace or padding baked into the original image files.
+
+  The cropped images are available as `logo.croppedSrc` on each `NormalizedLogo` object.
+
+  ```tsx
+  <LogoSoup logos={logos} cropToContent />
+  ```
+
+  <Note>
+    Cropping creates blob URLs that are cleaned up when the engine is destroyed. Don't store `croppedSrc` values beyond the engine's lifetime.
+  </Note>
+</ParamField>
+
+### `contrastThreshold`
+
+<ParamField path="contrastThreshold" type="number" default="10">
+  Minimum contrast distance (in RGB space) for a pixel to be considered "content" during content detection. Higher values ignore more low-contrast details near the background color.
+
+  You rarely need to change this. Increase it if logos with very subtle gradients or shadows are getting incorrect bounds.
+</ParamField>
+
+### `backgroundColor`
+
+<ParamField path="backgroundColor" type="string | [number, number, number]">
+  The background color the logos will be displayed on. Used for two things:
+
+  1. **Contrast detection** on opaque logos (logos without transparency) — the engine needs to know the background to distinguish content from the background
+  2. **Irradiation compensation** — light logos on dark backgrounds appear optically larger; this option enables the correction
+
+  Accepts CSS color strings (`"#1a1a1a"`, `"rgb(26, 26, 26)"`, `"hsl(0, 0%, 10%)"`) or RGB tuples (`[26, 26, 26]`).
+
+  When omitted, the engine auto-detects the background by analyzing the perimeter pixels of each image. This works well for logos with transparent backgrounds. For logos on opaque backgrounds (like JPEGs), providing the actual background color produces better results.
+
+  ```tsx
+  // Dark mode
+  <LogoSoup logos={logos} backgroundColor="#1a1a1a" />
+
+  // RGB tuple
+  <LogoSoup logos={logos} backgroundColor={[26, 26, 26]} />
+  ```
+</ParamField>
+
+## React Component Options
+
+These options are only available on the React `<LogoSoup>` component.
+
+### `gap`
+
+<ParamField path="gap" type="number | string" default="28">
+  Space between logos. Accepts a pixel number or a CSS string value.
+
+  ```tsx
+  <LogoSoup logos={logos} gap={24} />
+  <LogoSoup logos={logos} gap="1.5rem" />
+  ```
+</ParamField>
+
+### `alignBy`
+
+<ParamField path="alignBy" type="AlignmentMode" default="visual-center-y">
+  How to align logos within the row. See [Alignment Modes](#alignment-modes) below.
+
+  ```tsx
+  <LogoSoup logos={logos} alignBy="visual-center" />
+  ```
+</ParamField>
+
+### `renderImage`
+
+<ParamField path="renderImage" type="(props: ImageRenderProps) => ReactNode">
+  Custom image renderer. Receives all standard `<img>` attributes (`src`, `alt`, `width`, `height`, `style`). Use this to integrate with Next.js Image, add lazy loading, or fully control the `<img>` output.
+
+  ```tsx
+  import Image from "next/image";
+
+  <LogoSoup
+    logos={logos}
+    renderImage={(props) => (
+      <Image src={props.src} alt={props.alt} width={props.width} height={props.height} />
+    )}
+  />
+  ```
+</ParamField>
+
+### `className`
+
+<ParamField path="className" type="string">
+  CSS class name applied to the container `<div>`.
+</ParamField>
+
+### `style`
+
+<ParamField path="style" type="CSSProperties">
+  Inline styles applied to the container `<div>`. Merged with the default container styles (`text-align: center`, `text-wrap: balance`).
+</ParamField>
+
+### `onNormalized`
+
+<ParamField path="onNormalized" type="(logos: NormalizedLogo[]) => void">
+  Callback fired when normalization completes. Receives the array of normalized logos. Useful for analytics, debugging, or syncing state with external systems.
+
+  ```tsx
+  <LogoSoup
+    logos={logos}
+    onNormalized={(normalized) => {
+      console.log("Normalized:", normalized.length, "logos");
+    }}
+  />
+  ```
+</ParamField>
+
+## Alignment Modes
+
+Used with the `alignBy` prop (React component) or `getVisualCenterTransform` helper (all frameworks).
+
+| Mode | Description |
+| --- | --- |
+| `"bounds"` | Align by geometric center of the bounding box. No transform applied. |
+| `"visual-center"` | Align by visual weight center on both axes. Compensates for asymmetric logos where the "heavy" part isn't centered. |
+| `"visual-center-x"` | Visual center horizontally only. Vertical alignment uses bounds. |
+| `"visual-center-y"` | Visual center vertically only (default). Horizontal alignment uses bounds. Best for horizontal logo rows where vertical balance matters most. |
+
+### Using with the hook/composable
+
+When building custom layouts (not using the React `<LogoSoup>` component), apply alignment with `getVisualCenterTransform`:
+
+<CodeGroup>
+```tsx React
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+const transform = getVisualCenterTransform(logo, "visual-center-y");
+// Returns "translate(0px, -2.3px)" or undefined
+```
+
+```vue Vue
+<img :style="{ transform: getVisualCenterTransform(logo, 'visual-center-y') }" />
+```
+
+```svelte Svelte
+<img style:transform={getVisualCenterTransform(logo, "visual-center-y")} />
+```
+
+```tsx Solid
+style={{ transform: getVisualCenterTransform(logo, "visual-center-y") ?? "none" }}
+```
+
+```typescript Angular
+[style.transform]="getVisualCenterTransform(logo, alignBy())"
+```
+</CodeGroup>
+
+## NormalizedLogo Object
+
+Each processed logo is a `NormalizedLogo` with these properties:
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `src` | `string` | Original image URL |
+| `alt` | `string` | Alt text (empty string if not provided) |
+| `originalWidth` | `number` | Natural width of the source image |
+| `originalHeight` | `number` | Natural height of the source image |
+| `normalizedWidth` | `number` | Computed display width after normalization |
+| `normalizedHeight` | `number` | Computed display height after normalization |
+| `aspectRatio` | `number` | Content aspect ratio (width / height) |
+| `contentBox` | `BoundingBox?` | Detected content bounds within the image |
+| `pixelDensity` | `number?` | Measured visual density (0–1) |
+| `visualCenter` | `VisualCenter?` | Visual weight center with offset from geometric center |
+| `croppedSrc` | `string?` | Blob URL of the cropped image (when `cropToContent` is enabled) |

@@ -1,0 +1,288 @@
+---
+title: Vanilla JavaScript
+description: Use Logo Soup without any framework via the core createLogoSoup engine.
+---
+
+## Install
+
+```bash
+npm install @sanity-labs/logo-soup
+```
+
+No framework peer dependencies required. The core engine runs anywhere with a DOM (canvas API).
+
+## createLogoSoup Engine
+
+The core engine is what every framework adapter wraps. You can use it directly for vanilla JS apps, Web Components, or any framework that doesn't have a dedicated adapter.
+
+```ts
+import { createLogoSoup, getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+const engine = createLogoSoup();
+
+engine.subscribe(() => {
+  const { status, normalizedLogos, error } = engine.getSnapshot();
+
+  if (status === "loading") {
+    document.getElementById("logos")!.innerHTML = "Loading...";
+    return;
+  }
+
+  if (status === "error") {
+    console.error("Failed to load logos:", error);
+    return;
+  }
+
+  if (status === "ready") {
+    const container = document.getElementById("logos")!;
+    container.innerHTML = normalizedLogos
+      .map((logo) => {
+        const transform = getVisualCenterTransform(logo, "visual-center-y");
+        return `<img
+          src="${logo.croppedSrc || logo.src}"
+          alt="${logo.alt}"
+          width="${logo.normalizedWidth}"
+          height="${logo.normalizedHeight}"
+          style="
+            display: inline-block;
+            margin: 0 14px;
+            transform: ${transform ?? "none"};
+          "
+        />`;
+      })
+      .join("");
+  }
+});
+
+engine.process({
+  logos: [
+    { src: "/logos/acme.svg", alt: "Acme Corp" },
+    { src: "/logos/globex.svg", alt: "Globex" },
+    { src: "/logos/initech.svg", alt: "Initech" },
+  ],
+  baseSize: 48,
+  scaleFactor: 0.5,
+});
+```
+
+## Engine API
+
+### `createLogoSoup()`
+
+Creates a new engine instance. Each instance has its own image cache and state.
+
+```ts
+import { createLogoSoup } from "@sanity-labs/logo-soup";
+
+const engine = createLogoSoup();
+```
+
+### `engine.process(options)`
+
+Triggers a processing run. Cancels any in-flight work from a previous `process()` call. Accepts all [shared options](/options).
+
+```ts
+engine.process({
+  logos: ["/logos/acme.svg", "/logos/globex.svg"],
+  baseSize: 48,
+  scaleFactor: 0.5,
+  densityAware: true,
+  densityFactor: 0.5,
+  cropToContent: false,
+  contrastThreshold: 10,
+  backgroundColor: "#ffffff",
+});
+```
+
+Calling `process()` again with new options re-uses cached measurements for logos that haven't changed. Only new logos trigger image loading.
+
+### `engine.subscribe(listener)`
+
+Subscribes to state changes. Returns an unsubscribe function.
+
+```ts
+const unsubscribe = engine.subscribe(() => {
+  const state = engine.getSnapshot();
+  console.log(state.status, state.normalizedLogos.length);
+});
+
+// Later: stop listening
+unsubscribe();
+```
+
+The listener receives no arguments. Call `getSnapshot()` inside the listener to read the current state. This design matches the pattern expected by `React.useSyncExternalStore`, Vue's `shallowRef`, Svelte's `createSubscriber`, and Solid's `from()`.
+
+### `engine.getSnapshot()`
+
+Returns the current immutable state snapshot. Returns the same reference (`===`) when state hasn't changed, which is critical for frameworks that use referential equality to avoid unnecessary re-renders.
+
+```ts
+const state = engine.getSnapshot();
+```
+
+The snapshot shape:
+
+```ts
+type LogoSoupState = {
+  status: "idle" | "loading" | "ready" | "error";
+  normalizedLogos: NormalizedLogo[];
+  error: Error | null;
+};
+```
+
+| Status | Description |
+| --- | --- |
+| `"idle"` | Initial state, before `process()` is called |
+| `"loading"` | Images are being fetched and measured |
+| `"ready"` | All logos normalized, `normalizedLogos` is populated |
+| `"error"` | All images failed to load, `error` is set |
+
+<Note>
+  If some images fail but others succeed, the engine still transitions to `"ready"` with the successful logos. `"error"` only occurs when *all* images fail.
+</Note>
+
+### `engine.destroy()`
+
+Cleans up the engine: revokes blob URLs, cancels in-flight work, clears the image cache, and removes all subscribers.
+
+```ts
+engine.destroy();
+```
+
+Always call `destroy()` when you're done with the engine to avoid memory leaks from blob URLs.
+
+## Lifecycle
+
+A typical lifecycle looks like:
+
+```
+createLogoSoup()  →  idle
+     │
+  process()       →  loading  →  ready
+     │                           (or error if all fail)
+  process()       →  ready       (from cache, synchronous)
+     │
+  process()       →  loading  →  ready   (new logos, async)
+     │
+  destroy()
+```
+
+Calling `process()` while a previous run is still loading cancels the in-flight work. Only the latest `process()` call's results are emitted.
+
+## Re-processing on Option Changes
+
+Call `process()` again whenever options change. The engine caches image measurements, so re-processing with the same logos but different `baseSize` or `scaleFactor` is synchronous (no network requests):
+
+```ts
+// First call: loads images from network
+engine.process({ logos: ["/logo.svg"], baseSize: 48 });
+
+// Later: re-normalizes from cache (synchronous)
+engine.process({ logos: ["/logo.svg"], baseSize: 96 });
+```
+
+The cache is invalidated when `contrastThreshold`, `densityAware`, or `backgroundColor` change, since these affect the measurement itself.
+
+## Web Components Example
+
+```ts
+import { createLogoSoup, getVisualCenterTransform } from "@sanity-labs/logo-soup";
+import type { ProcessOptions, LogoSoupState } from "@sanity-labs/logo-soup";
+
+class LogoSoupElement extends HTMLElement {
+  private engine = createLogoSoup();
+  private unsubscribe: (() => void) | null = null;
+
+  static get observedAttributes() {
+    return ["base-size", "scale-factor"];
+  }
+
+  connectedCallback() {
+    this.unsubscribe = this.engine.subscribe(() => this.render());
+    this.update();
+  }
+
+  disconnectedCallback() {
+    this.unsubscribe?.();
+    this.engine.destroy();
+  }
+
+  attributeChangedCallback() {
+    this.update();
+  }
+
+  set logos(value: ProcessOptions["logos"]) {
+    this._logos = value;
+    this.update();
+  }
+
+  private _logos: ProcessOptions["logos"] = [];
+
+  private update() {
+    this.engine.process({
+      logos: this._logos,
+      baseSize: Number(this.getAttribute("base-size")) || 48,
+      scaleFactor: Number(this.getAttribute("scale-factor")) || 0.5,
+    });
+  }
+
+  private render() {
+    const { status, normalizedLogos } = this.engine.getSnapshot();
+    if (status !== "ready") return;
+
+    this.innerHTML = normalizedLogos
+      .map((logo) => {
+        const transform = getVisualCenterTransform(logo, "visual-center-y");
+        return `<img
+          src="${logo.src}" alt="${logo.alt}"
+          width="${logo.normalizedWidth}" height="${logo.normalizedHeight}"
+          style="display:inline-block;margin:0 14px;transform:${transform ?? "none"}"
+        />`;
+      })
+      .join("");
+  }
+}
+
+customElements.define("logo-soup", LogoSoupElement);
+```
+
+Usage:
+
+```html
+<logo-soup base-size="48" scale-factor="0.5"></logo-soup>
+
+<script>
+  document.querySelector("logo-soup").logos = [
+    { src: "/logos/acme.svg", alt: "Acme Corp" },
+    { src: "/logos/globex.svg", alt: "Globex" },
+  ];
+</script>
+```
+
+## Integrating with Other Frameworks
+
+The `subscribe`/`getSnapshot` shape is designed to plug into any reactivity system. If your framework isn't directly supported, the pattern is:
+
+1. Create an engine with `createLogoSoup()`
+2. Subscribe to changes and push snapshots into your framework's reactive primitive
+3. Call `process()` when options change
+4. Call `destroy()` on teardown
+
+```ts
+// Pseudocode for any framework:
+const engine = createLogoSoup();
+
+const unsubscribe = engine.subscribe(() => {
+  const snapshot = engine.getSnapshot();
+  yourFramework.setState(snapshot); // Push into your reactive system
+});
+
+// When options change:
+engine.process(newOptions);
+
+// On teardown:
+unsubscribe();
+engine.destroy();
+```
+
+This is exactly what the React, Vue, Svelte, Solid, and Angular adapters do, each in ~30-80 lines of framework-specific code.

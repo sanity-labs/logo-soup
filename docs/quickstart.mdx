@@ -1,0 +1,232 @@
+---
+title: Quickstart
+description: Install Logo Soup and get normalized logos rendering in under a minute.
+---
+
+## Install
+
+<CodeGroup>
+```bash npm
+npm install @sanity-labs/logo-soup
+```
+
+```bash pnpm
+pnpm add @sanity-labs/logo-soup
+```
+
+```bash yarn
+yarn add @sanity-labs/logo-soup
+```
+
+```bash bun
+bun add @sanity-labs/logo-soup
+```
+</CodeGroup>
+
+## Pick your framework
+
+<Tabs>
+  <Tab title="React">
+    The fastest way is the pre-built `<LogoSoup>` component:
+
+    ```tsx
+    import { LogoSoup } from "@sanity-labs/logo-soup/react";
+
+    function LogoStrip() {
+      return (
+        <LogoSoup
+          logos={[
+            { src: "/logos/acme.svg", alt: "Acme Corp" },
+            { src: "/logos/globex.svg", alt: "Globex" },
+            { src: "/logos/initech.svg", alt: "Initech" },
+          ]}
+        />
+      );
+    }
+    ```
+
+    That's it. Logo Soup analyzes each image and renders them visually balanced.
+
+    For custom layouts, use the `useLogoSoup` hook instead — see the [React guide](/frameworks/react).
+  </Tab>
+  <Tab title="Vue">
+    ```vue
+    <script setup>
+    import { ref } from "vue";
+    import { useLogoSoup } from "@sanity-labs/logo-soup/vue";
+
+    const logos = ref(["/logos/acme.svg", "/logos/globex.svg"]);
+    const { isReady, normalizedLogos } = useLogoSoup({ logos });
+    </script>
+
+    <template>
+      <div v-if="isReady">
+        <img
+          v-for="logo in normalizedLogos"
+          :key="logo.src"
+          :src="logo.src"
+          :alt="logo.alt"
+          :width="logo.normalizedWidth"
+          :height="logo.normalizedHeight"
+        />
+      </div>
+    </template>
+    ```
+
+    See the [Vue guide](/frameworks/vue) for reactive options and visual center alignment.
+  </Tab>
+  <Tab title="Svelte">
+    ```svelte
+    <script>
+      import { createLogoSoup } from "@sanity-labs/logo-soup/svelte";
+
+      let { logos = [] } = $props();
+      const soup = createLogoSoup();
+
+      $effect(() => {
+        soup.process({ logos });
+      });
+
+      $effect(() => {
+        return () => soup.destroy();
+      });
+    </script>
+
+    {#if soup.isReady}
+      {#each soup.normalizedLogos as logo (logo.src)}
+        <img
+          src={logo.src}
+          alt={logo.alt}
+          width={logo.normalizedWidth}
+          height={logo.normalizedHeight}
+        />
+      {/each}
+    {/if}
+    ```
+
+    See the [Svelte guide](/frameworks/svelte) for more details on runes integration.
+  </Tab>
+  <Tab title="Solid">
+    ```tsx
+    import { useLogoSoup } from "@sanity-labs/logo-soup/solid";
+    import { For, Show } from "solid-js";
+
+    function LogoStrip() {
+      const result = useLogoSoup(() => ({
+        logos: ["/logos/acme.svg", "/logos/globex.svg"],
+      }));
+
+      return (
+        <Show when={result.isReady}>
+          <For each={result.normalizedLogos}>
+            {(logo) => (
+              <img
+                src={logo.src}
+                alt={logo.alt}
+                width={logo.normalizedWidth}
+                height={logo.normalizedHeight}
+              />
+            )}
+          </For>
+        </Show>
+      );
+    }
+    ```
+
+    See the [Solid guide](/frameworks/solid) for the reactive getter pattern.
+  </Tab>
+  <Tab title="Angular">
+    ```typescript
+    import { Component, input, effect, inject } from "@angular/core";
+    import { LogoSoupService } from "@sanity-labs/logo-soup/angular";
+
+    @Component({
+      selector: "logo-strip",
+      standalone: true,
+      providers: [LogoSoupService],
+      template: `
+        @for (logo of service.state().normalizedLogos; track logo.src) {
+          <img [src]="logo.src" [alt]="logo.alt"
+               [width]="logo.normalizedWidth"
+               [height]="logo.normalizedHeight" />
+        }
+      `,
+    })
+    export class LogoStripComponent {
+      protected service = inject(LogoSoupService);
+      logos = input.required<string[]>();
+
+      constructor() {
+        effect(() => {
+          this.service.process({ logos: this.logos() });
+        });
+      }
+    }
+    ```
+
+    See the [Angular guide](/frameworks/angular) for signal patterns and service scoping.
+  </Tab>
+  <Tab title="Vanilla JS">
+    ```ts
+    import { createLogoSoup } from "@sanity-labs/logo-soup";
+
+    const engine = createLogoSoup();
+
+    engine.subscribe(() => {
+      const { status, normalizedLogos } = engine.getSnapshot();
+      if (status !== "ready") return;
+
+      document.getElementById("logos")!.innerHTML = normalizedLogos
+        .map(
+          (logo) =>
+            `<img src="${logo.src}" alt="${logo.alt}" width="${logo.normalizedWidth}" height="${logo.normalizedHeight}" />`
+        )
+        .join("");
+    });
+
+    engine.process({
+      logos: ["/logos/acme.svg", "/logos/globex.svg"],
+    });
+    ```
+
+    See the [Vanilla JS guide](/frameworks/vanilla) for the full engine API.
+  </Tab>
+</Tabs>
+
+## Logos format
+
+Logos can be plain URL strings or objects with `src` and optional `alt` text:
+
+```ts
+// Plain strings
+const logos = ["/logos/acme.svg", "/logos/globex.svg"];
+
+// Objects with alt text (recommended for accessibility)
+const logos = [
+  { src: "/logos/acme.svg", alt: "Acme Corp" },
+  { src: "/logos/globex.svg", alt: "Globex" },
+];
+
+// You can mix both
+const logos = [
+  "/logos/acme.svg",
+  { src: "/logos/globex.svg", alt: "Globex" },
+];
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Options reference" icon="sliders" href="/options">
+    Tune base size, density, scale factor, alignment, and more.
+  </Card>
+  <Card title="How it works" icon="microscope" href="/how-it-works">
+    Content detection, normalization math, and irradiation compensation explained.
+  </Card>
+  <Card title="Framework guides" icon="code" href="/frameworks/react">
+    Deep dives for React, Vue, Svelte, Solid, Angular, and vanilla JS.
+  </Card>
+  <Card title="Core engine API" icon="gear" href="/api-reference/create-logo-soup">
+    Use the engine directly for unsupported frameworks or advanced use cases.
+  </Card>
+</CardGroup>

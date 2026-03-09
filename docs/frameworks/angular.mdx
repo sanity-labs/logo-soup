@@ -1,0 +1,254 @@
+---
+title: Angular
+description: Use Logo Soup with Angular 19+ via the LogoSoupService injectable.
+---
+
+## Install
+
+```bash
+npm install @sanity-labs/logo-soup
+```
+
+Requires Angular 19 or later (signals API). Also works with Angular 20 and 21.
+
+## LogoSoupService
+
+The Angular adapter provides an `@Injectable` service that wraps the core engine using Angular signals. Provide it per component instance so each `<logo-soup>` gets its own engine with independent state and caching.
+
+```typescript
+import { Component, input, effect, inject, ChangeDetectionStrategy } from "@angular/core";
+import { LogoSoupService } from "@sanity-labs/logo-soup/angular";
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+import type { AlignmentMode, NormalizedLogo } from "@sanity-labs/logo-soup";
+
+@Component({
+  selector: "logo-strip",
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [LogoSoupService],
+  template: `
+    @if (service.state().status === 'ready') {
+      <div style="text-align: center; text-wrap: balance;">
+        @for (logo of service.state().normalizedLogos; track logo.src) {
+          <img
+            [src]="logo.croppedSrc || logo.src"
+            [alt]="logo.alt"
+            [width]="logo.normalizedWidth"
+            [height]="logo.normalizedHeight"
+            [style.transform]="getTransform(logo)"
+            style="display: inline-block; margin: 0 14px;"
+          />
+        }
+      </div>
+    }
+  `,
+})
+export class LogoStripComponent {
+  protected service = inject(LogoSoupService);
+
+  logos = input.required<(string | { src: string; alt?: string })[]>();
+  baseSize = input<number>(48);
+  scaleFactor = input<number>(0.5);
+  alignBy = input<AlignmentMode>("visual-center-y");
+
+  constructor() {
+    effect(() => {
+      this.service.process({
+        logos: this.logos(),
+        baseSize: this.baseSize(),
+        scaleFactor: this.scaleFactor(),
+      });
+    });
+  }
+
+  protected getTransform(logo: NormalizedLogo): string | undefined {
+    return getVisualCenterTransform(logo, this.alignBy());
+  }
+}
+```
+
+## Service API
+
+### `LogoSoupService`
+
+An `@Injectable` that wraps the core engine.
+
+| Member | Type | Description |
+| --- | --- | --- |
+| `state` | `Signal<LogoSoupState>` | Readonly signal containing the engine's current state |
+| `process(options)` | `(ProcessOptions) => void` | Trigger a processing run with new options |
+
+The `state` signal contains:
+
+```typescript
+type LogoSoupState = {
+  status: "idle" | "loading" | "ready" | "error";
+  normalizedLogos: NormalizedLogo[];
+  error: Error | null;
+};
+```
+
+### Scoping
+
+Provide the service at the **component level** via `providers`:
+
+```typescript
+@Component({
+  providers: [LogoSoupService], // Each component instance gets its own engine
+})
+```
+
+This ensures each component gets an independent engine with its own image cache. If you provide it at a module or root level, all consumers share a single engine, which is usually not what you want.
+
+## Reactive Options with Signals
+
+Since `effect()` automatically tracks signal reads, any input signal change re-triggers processing:
+
+```typescript
+@Component({
+  selector: "logo-strip",
+  standalone: true,
+  providers: [LogoSoupService],
+  template: `
+    @for (logo of service.state().normalizedLogos; track logo.src) {
+      <img [src]="logo.src" [alt]="logo.alt"
+           [width]="logo.normalizedWidth" [height]="logo.normalizedHeight" />
+    }
+  `,
+})
+export class LogoStripComponent {
+  protected service = inject(LogoSoupService);
+
+  logos = input.required<string[]>();
+  baseSize = input<number>(48);
+  densityAware = input<boolean>(true);
+  densityFactor = input<number>(0.5);
+  cropToContent = input<boolean>(false);
+
+  constructor() {
+    effect(() => {
+      this.service.process({
+        logos: this.logos(),
+        baseSize: this.baseSize(),
+        densityAware: this.densityAware(),
+        densityFactor: this.densityFactor(),
+        cropToContent: this.cropToContent(),
+      });
+    });
+  }
+}
+```
+
+Usage in a parent template:
+
+```html
+<logo-strip
+  [logos]="['logo1.svg', 'logo2.svg', 'logo3.svg']"
+  [baseSize]="64"
+  [densityAware]="true"
+/>
+```
+
+## Dark Mode
+
+Pass `backgroundColor` for proper contrast detection on opaque logos:
+
+```typescript
+@Component({
+  selector: "logo-strip",
+  standalone: true,
+  providers: [LogoSoupService],
+  template: `...`,
+})
+export class LogoStripComponent {
+  protected service = inject(LogoSoupService);
+
+  logos = input.required<string[]>();
+  isDark = input<boolean>(false);
+
+  constructor() {
+    effect(() => {
+      this.service.process({
+        logos: this.logos(),
+        backgroundColor: this.isDark() ? "#1a1a1a" : "#ffffff",
+      });
+    });
+  }
+}
+```
+
+## Loading and Error States
+
+Read the `status` field from the state signal:
+
+```html
+@switch (service.state().status) {
+  @case ('loading') {
+    <div class="skeleton-loader">Loading logos...</div>
+  }
+  @case ('error') {
+    <div class="error">{{ service.state().error?.message }}</div>
+  }
+  @case ('ready') {
+    @for (logo of service.state().normalizedLogos; track logo.src) {
+      <img [src]="logo.src" [alt]="logo.alt"
+           [width]="logo.normalizedWidth" [height]="logo.normalizedHeight" />
+    }
+  }
+}
+```
+
+## Visual Center Alignment
+
+Apply visual center alignment with `getVisualCenterTransform` from the core package:
+
+```typescript
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+import type { AlignmentMode, NormalizedLogo } from "@sanity-labs/logo-soup";
+
+// In your component class:
+alignBy = input<AlignmentMode>("visual-center-y");
+
+protected getTransform(logo: NormalizedLogo): string | undefined {
+  return getVisualCenterTransform(logo, this.alignBy());
+}
+```
+
+```html
+<img
+  [src]="logo.src"
+  [style.transform]="getTransform(logo)"
+/>
+```
+
+## Computed Helpers
+
+Use Angular's `computed()` to derive values from the state signal:
+
+```typescript
+import { computed, inject } from "@angular/core";
+import { LogoSoupService } from "@sanity-labs/logo-soup/angular";
+
+export class LogoStripComponent {
+  protected service = inject(LogoSoupService);
+
+  isReady = computed(() => this.service.state().status === "ready");
+  logoCount = computed(() => this.service.state().normalizedLogos.length);
+  hasError = computed(() => this.service.state().error !== null);
+}
+```
+
+## Cleanup
+
+The service uses `DestroyRef.onDestroy()` internally to unsubscribe from the engine and clean up blob URLs when the component is destroyed. You don't need to handle cleanup manually.
+
+## How It Works Under the Hood
+
+The Angular adapter bridges the core engine to Angular's signal-based reactivity:
+
+- **`signal()`** holds the engine state with `.asReadonly()` for public access — private writable, public readonly (Angular best practice for encapsulated state)
+- **`engine.subscribe()`** pushes state changes into the Angular signal via `_state.set()`
+- **`DestroyRef.onDestroy()`** unsubscribes and destroys the engine when the injector is torn down — the modern Angular cleanup API (replaces `OnDestroy` lifecycle hook)
+- **`ChangeDetectionStrategy.OnPush`** is recommended since signals drive change detection, eliminating the need for the default strategy
+- **`input()`** / **`input.required()`** are used instead of the `@Input()` decorator — this is the Angular 19+ way
+- **`@for` with `track`** is used instead of `*ngFor` — Angular 19+ built-in control flow

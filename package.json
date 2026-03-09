@@ -1,24 +1,80 @@
 {
-  "name": "react-logo-soup",
-  "version": "0.4.1",
-  "description": "A tiny React library that makes logos look good together",
+  "name": "@sanity-labs/logo-soup",
+  "version": "1.0.0",
+  "description": "A tiny framework-agnostic library that makes logos look good together",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "browserslist": "extends @sanity/browserslist-config",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.cjs"
+      "source": "./src/core/index.ts",
+      "import": "./dist/core/index.js",
+      "default": "./dist/core/index.js"
+    },
+    "./react": {
+      "source": "./src/react/index.ts",
+      "import": "./dist/react/index.js",
+      "default": "./dist/react/index.js"
+    },
+    "./vue": {
+      "source": "./src/vue/index.ts",
+      "import": "./dist/vue/index.js",
+      "default": "./dist/vue/index.js"
+    },
+    "./svelte": {
+      "source": "./src/svelte/index.ts",
+      "import": "./dist/svelte/index.js",
+      "default": "./dist/svelte/index.js"
+    },
+    "./solid": {
+      "source": "./src/solid/index.ts",
+      "import": "./dist/solid/index.js",
+      "default": "./dist/solid/index.js"
+    },
+    "./angular": {
+      "source": "./src/angular/index.ts",
+      "import": "./dist/angular/index.js",
+      "default": "./dist/angular/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/core/index.js",
+        "default": "./dist/core/index.js"
+      },
+      "./react": {
+        "import": "./dist/react/index.js",
+        "default": "./dist/react/index.js"
+      },
+      "./vue": {
+        "import": "./dist/vue/index.js",
+        "default": "./dist/vue/index.js"
+      },
+      "./svelte": {
+        "import": "./dist/svelte/index.js",
+        "default": "./dist/svelte/index.js"
+      },
+      "./solid": {
+        "import": "./dist/solid/index.js",
+        "default": "./dist/solid/index.js"
+      },
+      "./angular": {
+        "import": "./dist/angular/index.js",
+        "default": "./dist/angular/index.js"
+      },
+      "./package.json": "./package.json"
     }
   },
+  "main": "./dist/core/index.js",
+  "types": "./dist/core/index.d.ts",
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target browser --format esm --sourcemap=external --external react --external react-dom && bun build src/index.ts --outfile dist/index.cjs --target browser --format cjs --sourcemap=inline --external react --external react-dom && bun run build:types",
-    "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist",
+    "build": "pkg-utils build --strict --check --clean",
+    "release": "changeset publish",
     "generate:logos": "bun scripts/generate-test-logos.ts",
     "prepublishOnly": "bun run build",
     "test": "NODE_ENV=development bun test",
@@ -28,24 +84,34 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sanity-labs/react-logo-soup.git"
+    "url": "https://github.com/sanity-labs/logo-soup.git"
   },
-  "homepage": "https://github.com/sanity-labs/react-logo-soup#readme",
+  "homepage": "https://github.com/sanity-labs/logo-soup#readme",
   "bugs": {
-    "url": "https://github.com/sanity-labs/react-logo-soup/issues"
+    "url": "https://github.com/sanity-labs/logo-soup/issues"
   },
   "keywords": [
-    "react",
     "logo",
     "normalize",
     "layout",
-    "component"
+    "component",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "framework-agnostic"
   ],
   "license": "MIT",
   "devDependencies": {
+    "@angular/core": "^19",
+    "@changesets/changelog-github": "^0.6.0",
+    "@changesets/cli": "^2.30.0",
     "@chromatic-com/storybook": "^5.0.1",
     "@happy-dom/global-registrator": "^16",
     "@napi-rs/canvas": "^0.1.90",
+    "@sanity/browserslist-config": "^1.0.5",
+    "@sanity/pkg-utils": "^10.4.8",
     "@storybook/addon-docs": "^10.2.8",
     "@storybook/addon-links": "^10.2.8",
     "@storybook/react": "^10.2.8",
@@ -56,12 +122,42 @@
     "@types/react-dom": "^19",
     "react": "^19",
     "react-dom": "^19",
+    "solid-js": "^1.9",
     "storybook": "^10.2.8",
-    "vite": "^5"
+    "svelte": "^5",
+    "vite": "^5",
+    "vue": "^3.5"
   },
   "peerDependencies": {
     "react": "^18 || ^19",
     "react-dom": "^18 || ^19",
+    "vue": "^3.5",
+    "svelte": "^5",
+    "solid-js": "^1.9",
+    "@angular/core": "^19 || ^20 || ^21",
     "typescript": "^5"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    },
+    "@angular/core": {
+      "optional": true
+    },
+    "typescript": {
+      "optional": true
+    }
   }
 }

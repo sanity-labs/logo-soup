@@ -1,0 +1,195 @@
+---
+title: Solid
+description: Use Logo Soup with Solid 1.9+ via the useLogoSoup reactive primitive.
+---
+
+## Install
+
+```bash
+npm install @sanity-labs/logo-soup
+```
+
+Requires solid-js 1.9 or later.
+
+## useLogoSoup
+
+The Solid adapter wraps the core engine using `from()`, Solid's built-in primitive for external store subscriptions. Options are passed as a getter function so Solid can track reactive dependencies inside it.
+
+```tsx
+import { useLogoSoup } from "@sanity-labs/logo-soup/solid";
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+import { For, Show } from "solid-js";
+
+function LogoStrip() {
+  const result = useLogoSoup(() => ({
+    logos: [
+      { src: "/logos/acme.svg", alt: "Acme Corp" },
+      { src: "/logos/globex.svg", alt: "Globex" },
+      { src: "/logos/initech.svg", alt: "Initech" },
+    ],
+    baseSize: 48,
+    scaleFactor: 0.5,
+  }));
+
+  return (
+    <Show when={result.isReady}>
+      <div style={{ "text-align": "center" }}>
+        <For each={result.normalizedLogos}>
+          {(logo) => (
+            <img
+              src={logo.croppedSrc || logo.src}
+              alt={logo.alt}
+              width={logo.normalizedWidth}
+              height={logo.normalizedHeight}
+              style={{
+                display: "inline-block",
+                margin: "0 14px",
+                transform:
+                  getVisualCenterTransform(logo, "visual-center-y") ?? "none",
+              }}
+            />
+          )}
+        </For>
+      </div>
+    </Show>
+  );
+}
+```
+
+## Reactive Options
+
+Options are passed as a **getter function** `() => ProcessOptions`. This is the standard Solid pattern for reactive props. Any signals read inside the getter are automatically tracked:
+
+```tsx
+import { createSignal } from "solid-js";
+import { useLogoSoup } from "@sanity-labs/logo-soup/solid";
+
+function LogoStrip() {
+  const [logos, setLogos] = createSignal(["/logos/acme.svg"]);
+  const [baseSize, setBaseSize] = createSignal(48);
+
+  const result = useLogoSoup(() => ({
+    logos: logos(),
+    baseSize: baseSize(),
+    scaleFactor: 0.5,
+  }));
+
+  return (
+    <div>
+      <button onClick={() => setBaseSize((s) => (s === 48 ? 64 : 48))}>
+        Toggle size
+      </button>
+      <button
+        onClick={() => setLogos((prev) => [...prev, "/logos/globex.svg"])}
+      >
+        Add logo
+      </button>
+      <Show when={result.isReady}>
+        <For each={result.normalizedLogos}>
+          {(logo) => (
+            <img
+              src={logo.src}
+              alt={logo.alt}
+              width={logo.normalizedWidth}
+              height={logo.normalizedHeight}
+            />
+          )}
+        </For>
+      </Show>
+    </div>
+  );
+}
+```
+
+Internally, `createEffect` re-evaluates the getter whenever any signal it reads changes, then calls `engine.process()` with the new options.
+
+## Return Value
+
+The return value is an object with reactive getters:
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `isLoading` | `boolean` | `true` while images are being loaded and measured |
+| `isReady` | `boolean` | `true` when all logos are normalized and ready to render |
+| `normalizedLogos` | `NormalizedLogo[]` | The processed logos with computed dimensions |
+| `error` | `Error \| null` | Set if all images fail to load |
+
+<Warning>
+  These are **getters**, not signals. You read them as properties (`result.isReady`), not function calls (`result.isReady()`). Each getter internally reads a signal created by `from()`, so they're fully reactive in Solid's tracking system.
+</Warning>
+
+## Visual Center Alignment
+
+Apply visual center alignment with the `getVisualCenterTransform` helper:
+
+```tsx
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+// Inside a component:
+<For each={result.normalizedLogos}>
+  {(logo) => (
+    <img
+      src={logo.src}
+      alt={logo.alt}
+      width={logo.normalizedWidth}
+      height={logo.normalizedHeight}
+      style={{
+        transform:
+          getVisualCenterTransform(logo, "visual-center-y") ?? "none",
+      }}
+    />
+  )}
+</For>;
+```
+
+## Dark Mode
+
+Pass `backgroundColor` so Logo Soup can detect contrast on opaque logos and apply irradiation compensation:
+
+```tsx
+import { createSignal } from "solid-js";
+import { useLogoSoup } from "@sanity-labs/logo-soup/solid";
+
+function LogoStrip() {
+  const [isDark, setIsDark] = createSignal(false);
+
+  const result = useLogoSoup(() => ({
+    logos: ["/logos/acme.svg", "/logos/globex.svg"],
+    backgroundColor: isDark() ? "#1a1a1a" : "#ffffff",
+  }));
+
+  // ...
+}
+```
+
+## Cleanup
+
+The engine is automatically destroyed when the owning reactive scope is disposed (via `onCleanup`). You don't need to call `destroy()` manually in components.
+
+If you use `useLogoSoup` outside a component (e.g., in a `createRoot`), make sure to dispose the root when you're done:
+
+```tsx
+import { createRoot } from "solid-js";
+import { useLogoSoup } from "@sanity-labs/logo-soup/solid";
+
+const dispose = createRoot((dispose) => {
+  const result = useLogoSoup(() => ({
+    logos: ["/logo.svg"],
+  }));
+
+  // Use result...
+
+  return dispose;
+});
+
+// Later: clean up
+dispose();
+```
+
+## How It Works Under the Hood
+
+The Solid adapter uses three Solid primitives:
+
+- **`from()`** — Bridges the engine's `subscribe`/`getSnapshot` interface into a Solid signal. `from()` accepts a producer function `(set) => unsubscribe` and returns a read-only accessor.
+- **`createEffect()`** — Re-runs when any signal read inside the options getter changes, calling `engine.process()` with the new values.
+- **`onCleanup()`** — Destroys the engine when the reactive scope is torn down.

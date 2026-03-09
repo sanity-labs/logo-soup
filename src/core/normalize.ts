@@ -1,4 +1,4 @@
-import type { LogoSource, MeasurementResult, NormalizedLogo } from "../types";
+import type { LogoSource, MeasurementResult, NormalizedLogo } from "./types";
 
 export function logosEqual(
   a: (string | LogoSource)[],

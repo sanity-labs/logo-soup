@@ -1,0 +1,166 @@
+---
+title: getVisualCenterTransform
+description: Compute a CSS transform to align a logo by its visual weight center.
+---
+
+A pure function that computes a CSS `translate()` transform to shift a logo from its geometric center to its visual weight center. This compensates for asymmetric logos where the perceived center doesn't match the bounding box center.
+
+```ts
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+const transform = getVisualCenterTransform(logo, "visual-center-y");
+// Returns "translate(0px, -2.3px)" or undefined
+```
+
+## Signature
+
+```ts
+function getVisualCenterTransform(
+  logo: NormalizedLogo,
+  alignBy?: AlignmentMode,
+): string | undefined;
+```
+
+## Parameters
+
+<ParamField path="logo" type="NormalizedLogo" required>
+  A normalized logo object returned by the engine, hook, or composable. Must have `visualCenter`, `normalizedWidth`, `normalizedHeight`, and optionally `contentBox` and `originalWidth`/`originalHeight` for scale computation.
+</ParamField>
+
+<ParamField path="alignBy" type="AlignmentMode" default="visual-center-y">
+  The alignment mode to use. Determines which axes are compensated.
+
+  | Mode | Description |
+  | --- | --- |
+  | `"bounds"` | No transform. Returns `undefined`. |
+  | `"visual-center"` | Compensate on both X and Y axes. |
+  | `"visual-center-x"` | Compensate horizontally only. |
+  | `"visual-center-y"` | Compensate vertically only (default). |
+</ParamField>
+
+## Returns
+
+`string | undefined`
+
+- A CSS `translate()` string like `"translate(0px, -2.3px)"` when a meaningful offset exists (greater than 0.5px on either axis).
+- `undefined` when no adjustment is needed — either because `alignBy` is `"bounds"`, the logo has no `visualCenter` data, or the offset is negligibly small.
+
+## Usage
+
+### With the React component
+
+The `<LogoSoup>` component applies this automatically via the `alignBy` prop. You don't need to call this function directly when using the component.
+
+```tsx
+import { LogoSoup } from "@sanity-labs/logo-soup/react";
+
+// Alignment is handled internally
+<LogoSoup logos={logos} alignBy="visual-center-y" />
+```
+
+### With the React hook
+
+When building custom layouts with `useLogoSoup`, apply the transform manually:
+
+```tsx
+import { useLogoSoup } from "@sanity-labs/logo-soup/react";
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+function CustomGrid() {
+  const { normalizedLogos } = useLogoSoup({ logos });
+
+  return (
+    <div className="flex gap-4">
+      {normalizedLogos.map((logo) => (
+        <img
+          key={logo.src}
+          src={logo.src}
+          alt={logo.alt}
+          width={logo.normalizedWidth}
+          height={logo.normalizedHeight}
+          style={{
+            transform: getVisualCenterTransform(logo, "visual-center-y"),
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+### With other frameworks
+
+<CodeGroup>
+```vue Vue
+<template>
+  <img
+    v-for="logo in normalizedLogos"
+    :key="logo.src"
+    :src="logo.src"
+    :alt="logo.alt"
+    :width="logo.normalizedWidth"
+    :height="logo.normalizedHeight"
+    :style="{ transform: getVisualCenterTransform(logo, 'visual-center-y') }"
+  />
+</template>
+```
+
+```svelte Svelte
+{#each soup.normalizedLogos as logo (logo.src)}
+  <img
+    src={logo.src}
+    alt={logo.alt}
+    width={logo.normalizedWidth}
+    height={logo.normalizedHeight}
+    style:transform={getVisualCenterTransform(logo, "visual-center-y")}
+  />
+{/each}
+```
+
+```tsx Solid
+<For each={result.normalizedLogos}>
+  {(logo) => (
+    <img
+      src={logo.src}
+      alt={logo.alt}
+      width={logo.normalizedWidth}
+      height={logo.normalizedHeight}
+      style={{
+        transform: getVisualCenterTransform(logo, "visual-center-y") ?? "none",
+      }}
+    />
+  )}
+</For>
+```
+
+```typescript Angular
+// In the component class:
+protected getTransform(logo: NormalizedLogo): string | undefined {
+  return getVisualCenterTransform(logo, this.alignBy());
+}
+
+// In the template:
+// <img [style.transform]="getTransform(logo)" />
+```
+</CodeGroup>
+
+## How it works
+
+The function computes the offset between a logo's geometric center and its visual weight center, scaled to the normalized dimensions:
+
+1. The `visualCenter` on each `NormalizedLogo` contains `offsetX` and `offsetY` — the displacement from the geometric center of the content box, in source image pixels.
+2. These offsets are scaled by the ratio of normalized dimensions to content box dimensions (or original dimensions if no content box exists).
+3. If the resulting pixel offset exceeds 0.5px on either axis, a `translate()` string is returned. Below that threshold, the function returns `undefined` to avoid sub-pixel jitter.
+4. Values are rounded to one decimal place for clean CSS output.
+
+### Example offset
+
+Consider a logo where the icon is positioned above the wordmark. The geometric center of the bounding box is between the icon and text, but the visual weight is biased toward the denser wordmark below. The `visualCenter.offsetY` would be positive (shifted down), and `getVisualCenterTransform` would return a negative Y translate to shift the logo up, centering it on its visual weight.
+
+## Why `"visual-center-y"` is the default
+
+For horizontal logo rows (the most common layout), vertical misalignment is the most noticeable problem. Logos appear to "bounce" up and down relative to each other. Horizontal misalignment is less perceptible because logos already have spacing between them.
+
+Using `"visual-center-y"` corrects the vertical bounce without introducing unexpected horizontal shifts, which makes it the safest default for most use cases.
+
+Use `"visual-center"` (both axes) when logos are displayed in a grid or when horizontal balance matters equally.

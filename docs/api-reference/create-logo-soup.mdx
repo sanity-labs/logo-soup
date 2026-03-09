@@ -1,0 +1,230 @@
+---
+title: createLogoSoup
+description: Create a framework-agnostic logo normalization engine.
+---
+
+The core factory function that creates a new engine instance. This is what every framework adapter wraps internally, and what you use directly for vanilla JS or unsupported frameworks.
+
+```ts
+import { createLogoSoup } from "@sanity-labs/logo-soup";
+
+const engine = createLogoSoup();
+```
+
+## Returns
+
+`LogoSoupEngine` — an object with the following methods:
+
+### `engine.process(options)`
+
+Triggers a processing run. Loads images, measures them, and produces normalized dimensions. Cancels any in-flight work from a previous `process()` call.
+
+<ParamField path="options" type="ProcessOptions" required>
+  The processing options. See [Options Reference](/options) for full details.
+
+  ```ts
+  engine.process({
+    logos: [
+      { src: "/logos/acme.svg", alt: "Acme Corp" },
+      { src: "/logos/globex.svg", alt: "Globex" },
+    ],
+    baseSize: 48,
+    scaleFactor: 0.5,
+    densityAware: true,
+    densityFactor: 0.5,
+    cropToContent: false,
+    contrastThreshold: 10,
+    backgroundColor: "#ffffff",
+  });
+  ```
+</ParamField>
+
+**Behavior:**
+
+- If `logos` is empty, transitions directly to `"ready"` with an empty array (synchronous).
+- If all logos are already cached, re-normalizes from cache (synchronous, no network requests).
+- Otherwise, transitions to `"loading"`, fetches images, measures them, and transitions to `"ready"` or `"error"`.
+- Calling `process()` again while loading cancels the previous run. Only the latest call's results are emitted.
+
+### `engine.subscribe(listener)`
+
+Subscribes to state changes. Returns an unsubscribe function.
+
+<ParamField path="listener" type="() => void" required>
+  A callback invoked whenever the engine's state changes. The listener receives no arguments — call `getSnapshot()` inside it to read the current state.
+</ParamField>
+
+**Returns:** `() => void` — call this to unsubscribe.
+
+```ts
+const unsubscribe = engine.subscribe(() => {
+  const state = engine.getSnapshot();
+  console.log(state.status, state.normalizedLogos.length);
+});
+
+// Later:
+unsubscribe();
+```
+
+<Note>
+  The `subscribe(callback) → unsubscribe` shape is designed to plug directly into framework reactivity primitives: React's `useSyncExternalStore`, Vue's `shallowRef`, Svelte's `createSubscriber`, Solid's `from()`, and Angular's `signal()`.
+</Note>
+
+### `engine.getSnapshot()`
+
+Returns the current immutable state snapshot.
+
+**Returns:** `LogoSoupState`
+
+```ts
+const { status, normalizedLogos, error } = engine.getSnapshot();
+```
+
+<Warning>
+  `getSnapshot()` must return the **same reference** (`===`) when state hasn't changed. This is a hard requirement for React's `useSyncExternalStore` — if it returns a new object each time, React enters an infinite re-render loop. The engine handles this internally.
+</Warning>
+
+### `engine.destroy()`
+
+Cleans up the engine: revokes blob URLs created by `cropToContent`, cancels in-flight image loading, clears the measurement cache, and removes all subscribers.
+
+```ts
+engine.destroy();
+```
+
+Always call `destroy()` when you're done with the engine. Framework adapters handle this automatically on component unmount / scope disposal.
+
+After calling `destroy()`, the engine ignores subsequent `process()` calls.
+
+## Types
+
+### `LogoSoupEngine`
+
+```ts
+type LogoSoupEngine = {
+  process(options: ProcessOptions): void;
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): LogoSoupState;
+  destroy(): void;
+};
+```
+
+### `LogoSoupState`
+
+```ts
+type LogoSoupState = {
+  status: "idle" | "loading" | "ready" | "error";
+  normalizedLogos: NormalizedLogo[];
+  error: Error | null;
+};
+```
+
+| Status | Description |
+| --- | --- |
+| `"idle"` | Initial state, before `process()` is called |
+| `"loading"` | Images are being fetched and measured |
+| `"ready"` | Normalization complete, `normalizedLogos` is populated |
+| `"error"` | All images failed to load, `error` is set |
+
+<Note>
+  If some images fail but others succeed, the engine transitions to `"ready"` with the successful logos. `"error"` only occurs when **every** image fails.
+</Note>
+
+### `ProcessOptions`
+
+```ts
+type ProcessOptions = {
+  logos: (string | LogoSource)[];
+  baseSize?: number;            // default: 48
+  scaleFactor?: number;         // default: 0.5
+  contrastThreshold?: number;   // default: 10
+  densityAware?: boolean;       // default: true
+  densityFactor?: number;       // default: 0.5
+  cropToContent?: boolean;      // default: false
+  backgroundColor?: BackgroundColor;
+};
+```
+
+See [Options Reference](/options) for detailed descriptions of each field.
+
+### `NormalizedLogo`
+
+```ts
+type NormalizedLogo = {
+  src: string;
+  alt: string;
+  originalWidth: number;
+  originalHeight: number;
+  contentBox?: BoundingBox;
+  normalizedWidth: number;
+  normalizedHeight: number;
+  aspectRatio: number;
+  pixelDensity?: number;
+  visualCenter?: VisualCenter;
+  croppedSrc?: string;
+};
+```
+
+See [Options Reference](/options#normalizedlogo-object) for field descriptions.
+
+## Caching Behavior
+
+The engine caches image measurements by URL. This means:
+
+- **Changing `baseSize` or `scaleFactor`** re-normalizes from cache (synchronous, no network).
+- **Changing `contrastThreshold`, `densityAware`, or `backgroundColor`** invalidates the cache because these affect the measurement itself.
+- **Adding new logos** only loads the new ones; previously cached logos are reused.
+- **Removing logos** prunes their cache entries and revokes any associated blob URLs.
+
+## Example: Full Lifecycle
+
+```ts
+import { createLogoSoup, getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+const engine = createLogoSoup();
+
+// 1. Subscribe to state changes
+const unsubscribe = engine.subscribe(() => {
+  const { status, normalizedLogos, error } = engine.getSnapshot();
+
+  switch (status) {
+    case "loading":
+      console.log("Loading logos...");
+      break;
+    case "ready":
+      console.log("Ready:", normalizedLogos.length, "logos");
+      for (const logo of normalizedLogos) {
+        const transform = getVisualCenterTransform(logo, "visual-center-y");
+        console.log(`  ${logo.alt}: ${logo.normalizedWidth}x${logo.normalizedHeight}`, transform);
+      }
+      break;
+    case "error":
+      console.error("Failed:", error?.message);
+      break;
+  }
+});
+
+// 2. Process logos
+engine.process({
+  logos: [
+    { src: "/logos/acme.svg", alt: "Acme" },
+    { src: "/logos/globex.svg", alt: "Globex" },
+  ],
+});
+// → "Loading logos..."
+// → "Ready: 2 logos"
+
+// 3. Re-process with different size (uses cache, synchronous)
+engine.process({
+  logos: [
+    { src: "/logos/acme.svg", alt: "Acme" },
+    { src: "/logos/globex.svg", alt: "Globex" },
+  ],
+  baseSize: 96,
+});
+// → "Ready: 2 logos" (instant, no loading state)
+
+// 4. Clean up
+unsubscribe();
+engine.destroy();
+```

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { analyzePerimeter } from "../src/utils/measure";
+import { analyzePerimeter } from "../src/core/measure";
 
 function rgba(r: number, g: number, b: number, a: number): number {
   return ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;

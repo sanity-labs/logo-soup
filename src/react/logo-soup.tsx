@@ -1,8 +1,8 @@
 import { type CSSProperties, useEffect } from "react";
-import { DEFAULT_ALIGN_BY, DEFAULT_GAP } from "../constants";
-import { useLogoSoup } from "../hooks/useLogoSoup";
-import type { ImageRenderProps, LogoSoupProps } from "../types";
-import { getVisualCenterTransform } from "../utils/getVisualCenterTransform";
+import { DEFAULT_ALIGN_BY, DEFAULT_GAP } from "../core/constants";
+import { getVisualCenterTransform } from "../core/get-visual-center-transform";
+import type { ImageRenderProps, LogoSoupProps } from "./types";
+import { useLogoSoup } from "./use-logo-soup";
 
 const logoWrapperStyle: CSSProperties = {
   display: "inline-block",
@@ -54,7 +54,8 @@ export function LogoSoup({
     }
   }, [isReady, normalizedLogos, onNormalized]);
 
-  const halfGap = typeof gap === "number" ? `${gap / 2}px` : `calc(${gap} / 2)`;
+  const halfGap =
+    typeof gap === "number" ? `${gap / 2}px` : `calc(${gap} / 2)`;
 
   const containerStyle: CSSProperties = {
     textAlign: "center",
