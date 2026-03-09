@@ -3,7 +3,14 @@ import { readFile } from "node:fs/promises";
 import { measureContent } from "../core/measure-pixels";
 import type { MeasurementResult } from "../core/types";
 
-export type { MeasurementResult } from "../core/types";
+export type {
+  AlignmentMode,
+  BoundingBox,
+  LogoSource,
+  MeasurementResult,
+  NormalizedLogo,
+  VisualCenter,
+} from "../core/types";
 export {
   calculateNormalizedDimensions,
   createNormalizedLogo,
