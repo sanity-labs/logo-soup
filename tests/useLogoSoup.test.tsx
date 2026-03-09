@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { renderHook, waitFor } from "@testing-library/react";
-import { useLogoSoup } from "../src/hooks/useLogoSoup";
+import { useLogoSoup } from "../src/react/use-logo-soup";
 
 const originalImage = globalThis.Image;
 

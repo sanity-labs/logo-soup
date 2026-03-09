@@ -1,0 +1,155 @@
+---
+title: React
+description: Use Logo Soup with React via the LogoSoup component or the useLogoSoup hook.
+---
+
+## Install
+
+```bash
+npm install @sanity-labs/logo-soup
+```
+
+React 18 and 19 are both supported.
+
+## LogoSoup Component
+
+The fastest way to get started. Drop it in and it handles everything:
+
+```tsx
+import { LogoSoup } from "@sanity-labs/logo-soup/react";
+
+function LogoStrip() {
+  return (
+    <LogoSoup
+      logos={[
+        { src: "/logos/acme.svg", alt: "Acme Corp" },
+        { src: "/logos/globex.svg", alt: "Globex" },
+        { src: "/logos/initech.svg", alt: "Initech" },
+      ]}
+      baseSize={48}
+      gap={28}
+      alignBy="visual-center-y"
+    />
+  );
+}
+```
+
+The component renders a centered, balanced row of logos with a fade-in transition. It returns `null` if all images fail to load.
+
+### Component Props
+
+All [shared options](/options) are supported as props, plus these React-specific ones:
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `gap` | `number \| string` | `28` | Space between logos |
+| `alignBy` | `AlignmentMode` | `"visual-center-y"` | How to align logos |
+| `renderImage` | `(props) => ReactNode` | `<img>` | Custom image renderer |
+| `className` | `string` | — | Container class name |
+| `style` | `CSSProperties` | — | Container inline styles |
+| `onNormalized` | `(logos) => void` | — | Callback when normalization completes |
+
+## useLogoSoup Hook
+
+For custom layouts, use the hook directly:
+
+```tsx
+import { useLogoSoup } from "@sanity-labs/logo-soup/react";
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+function CustomGrid() {
+  const { isLoading, isReady, normalizedLogos, error } = useLogoSoup({
+    logos: [
+      { src: "/logo1.svg", alt: "Logo 1" },
+      { src: "/logo2.svg", alt: "Logo 2" },
+    ],
+    baseSize: 48,
+    scaleFactor: 0.5,
+  });
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <div className="flex items-center gap-4">
+      {normalizedLogos.map((logo) => (
+        <img
+          key={logo.src}
+          src={logo.croppedSrc || logo.src}
+          alt={logo.alt}
+          width={logo.normalizedWidth}
+          height={logo.normalizedHeight}
+          style={{
+            transform: getVisualCenterTransform(logo, "visual-center-y"),
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+### Return Value
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `isLoading` | `boolean` | `true` while images are being loaded and measured |
+| `isReady` | `boolean` | `true` when all logos are normalized and ready to render |
+| `normalizedLogos` | `NormalizedLogo[]` | The processed logos with computed dimensions |
+| `error` | `Error \| null` | Set if all images fail to load |
+
+## Custom Image Component
+
+Use `renderImage` to integrate with Next.js Image, Remix, or add custom attributes:
+
+### Next.js Image
+
+```tsx
+import Image from "next/image";
+import { LogoSoup } from "@sanity-labs/logo-soup/react";
+
+<LogoSoup
+  logos={logos}
+  renderImage={(props) => (
+    <Image
+      src={props.src}
+      alt={props.alt}
+      width={props.width}
+      height={props.height}
+    />
+  )}
+/>;
+```
+
+### Lazy loading
+
+```tsx
+<LogoSoup
+  logos={logos}
+  renderImage={(props) => (
+    <img {...props} loading="lazy" decoding="async" />
+  )}
+/>
+```
+
+## Visual Center Alignment
+
+When using the hook, apply visual center alignment with `getVisualCenterTransform`:
+
+```tsx
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+// Inside your component:
+const transform = getVisualCenterTransform(logo, "visual-center-y");
+// Returns something like "translate(0px, -2.3px)" or undefined
+```
+
+This compensates for logos with asymmetric visual weight (e.g., a logo where the icon is heavier on one side). The `<LogoSoup>` component applies this automatically via the `alignBy` prop.
+
+## SSR
+
+The hook provides a `getServerSnapshot` that returns an idle state during server rendering. Logos are always processed client-side (canvas is required). The component renders an empty container on the server and hydrates with normalized logos on the client.
+
+## How It Works Under the Hood
+
+The React adapter uses `useSyncExternalStore` to subscribe to the core engine. The engine is created once in a `useRef` and destroyed on unmount. The `logos` array reference is stabilized internally (deep comparison by `src`) to prevent infinite re-render loops when consumers pass inline array literals.

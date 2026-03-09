@@ -1,0 +1,161 @@
+---
+title: Vue
+description: Use Logo Soup with Vue 3.5+ via the useLogoSoup composable.
+---
+
+## Install
+
+```bash
+npm install @sanity-labs/logo-soup
+```
+
+Requires Vue 3.5 or later.
+
+## useLogoSoup Composable
+
+```vue
+<script setup>
+import { ref } from "vue";
+import { useLogoSoup } from "@sanity-labs/logo-soup/vue";
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+const logos = ref([
+  { src: "/logos/acme.svg", alt: "Acme Corp" },
+  { src: "/logos/globex.svg", alt: "Globex" },
+  { src: "/logos/initech.svg", alt: "Initech" },
+]);
+
+const { isLoading, isReady, normalizedLogos, error } = useLogoSoup({
+  logos,
+  baseSize: 48,
+  scaleFactor: 0.5,
+});
+</script>
+
+<template>
+  <div v-if="error">Error: {{ error.message }}</div>
+  <div v-else-if="isReady" style="text-align: center">
+    <img
+      v-for="logo in normalizedLogos"
+      :key="logo.src"
+      :src="logo.croppedSrc || logo.src"
+      :alt="logo.alt"
+      :width="logo.normalizedWidth"
+      :height="logo.normalizedHeight"
+      :style="{
+        transform: getVisualCenterTransform(logo, 'visual-center-y'),
+        display: 'inline-block',
+        margin: '0 14px',
+      }"
+    />
+  </div>
+</template>
+```
+
+## Reactive Options
+
+Every option accepts a plain value, a `ref`, or a getter function (`MaybeRefOrGetter`). The composable auto-tracks dependencies via `watchEffect` and re-processes whenever any option changes.
+
+```vue
+<script setup>
+import { ref, computed } from "vue";
+import { useLogoSoup } from "@sanity-labs/logo-soup/vue";
+
+const logos = ref(["/logos/acme.svg", "/logos/globex.svg"]);
+const baseSize = ref(48);
+const isDark = ref(false);
+
+const backgroundColor = computed(() => (isDark.value ? "#1a1a1a" : "#ffffff"));
+
+const { isReady, normalizedLogos } = useLogoSoup({
+  logos,
+  baseSize,
+  backgroundColor,
+  densityAware: true,
+  densityFactor: 0.5,
+});
+
+function addLogo(src: string) {
+  logos.value = [...logos.value, src];
+  // The composable automatically re-processes
+}
+</script>
+```
+
+### Options Type
+
+```ts
+type UseLogoSoupOptions = {
+  logos: MaybeRefOrGetter<(string | LogoSource)[]>;
+  baseSize?: MaybeRefOrGetter<number | undefined>;
+  scaleFactor?: MaybeRefOrGetter<number | undefined>;
+  contrastThreshold?: MaybeRefOrGetter<number | undefined>;
+  densityAware?: MaybeRefOrGetter<boolean | undefined>;
+  densityFactor?: MaybeRefOrGetter<number | undefined>;
+  cropToContent?: MaybeRefOrGetter<boolean | undefined>;
+  backgroundColor?: MaybeRefOrGetter<BackgroundColor | undefined>;
+};
+```
+
+All [shared options](/options) are supported. Each is unwrapped with Vue's `toValue()` internally.
+
+## Return Value
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `state` | `ShallowRef<LogoSoupState>` | Raw reactive state from the engine |
+| `isLoading` | `ComputedRef<boolean>` | `true` while images are being loaded |
+| `isReady` | `ComputedRef<boolean>` | `true` when normalization is complete |
+| `normalizedLogos` | `ComputedRef<NormalizedLogo[]>` | The processed logos |
+| `error` | `ComputedRef<Error \| null>` | Set if all images fail to load |
+
+All return values are reactive. Reading them in a template or `watchEffect` automatically tracks changes.
+
+## Visual Center Alignment
+
+Apply visual center alignment with the `getVisualCenterTransform` helper from the core package:
+
+```vue
+<script setup>
+import { useLogoSoup } from "@sanity-labs/logo-soup/vue";
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+const { normalizedLogos } = useLogoSoup({ logos: ["/logo.svg"] });
+</script>
+
+<template>
+  <img
+    v-for="logo in normalizedLogos"
+    :key="logo.src"
+    :src="logo.src"
+    :style="{ transform: getVisualCenterTransform(logo, 'visual-center-y') }"
+  />
+</template>
+```
+
+## Using in Effect Scopes
+
+The composable uses `onScopeDispose` (not `onUnmounted`) for cleanup, so it works correctly inside any Vue effect scope, not just components. This means you can use it in composables that create their own `effectScope`:
+
+```ts
+import { effectScope } from "vue";
+import { useLogoSoup } from "@sanity-labs/logo-soup/vue";
+
+const scope = effectScope();
+
+const result = scope.run(() => {
+  return useLogoSoup({ logos: ["/logo.svg"] });
+});
+
+// Later: clean up the engine
+scope.stop();
+```
+
+## How It Works Under the Hood
+
+The Vue adapter creates a core `createLogoSoup` engine instance and bridges it to Vue's reactivity system:
+
+- **`shallowRef`** holds the engine's state snapshot (not `ref`, since the snapshot is an immutable object that doesn't need deep reactivity)
+- **`watchEffect`** auto-tracks which options are read and re-runs `engine.process()` when they change
+- **`onScopeDispose`** unsubscribes and destroys the engine when the scope is torn down
+- **`computed`** refs derive convenience properties (`isLoading`, `isReady`, etc.) from the shallow ref

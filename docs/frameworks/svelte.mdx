@@ -1,0 +1,246 @@
+---
+title: Svelte
+description: Use Logo Soup with Svelte 5 via the createLogoSoup runes-compatible store.
+---
+
+## Install
+
+```bash
+npm install @sanity-labs/logo-soup
+```
+
+Requires Svelte 5 (runes). The adapter uses `createSubscriber` from `svelte/reactivity` (available since 5.7.0).
+
+## createLogoSoup
+
+The Svelte adapter exposes a `createLogoSoup` function that returns a reactive object. Reading its properties inside an `$effect` or template automatically subscribes to state changes.
+
+```svelte
+<script>
+  import { createLogoSoup } from "@sanity-labs/logo-soup/svelte";
+  import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+  let { logos = [], baseSize = 48, scaleFactor = 0.5 } = $props();
+
+  const soup = createLogoSoup();
+
+  $effect(() => {
+    soup.process({ logos, baseSize, scaleFactor });
+  });
+
+  $effect(() => {
+    return () => soup.destroy();
+  });
+</script>
+
+{#if soup.isReady}
+  <div style="text-align: center;">
+    {#each soup.normalizedLogos as logo (logo.src)}
+      <img
+        src={logo.croppedSrc || logo.src}
+        alt={logo.alt}
+        width={logo.normalizedWidth}
+        height={logo.normalizedHeight}
+        style:transform={getVisualCenterTransform(logo, "visual-center-y")}
+        style:display="inline-block"
+        style:margin="0 14px"
+      />
+    {/each}
+  </div>
+{/if}
+```
+
+## Reactive Properties
+
+The object returned by `createLogoSoup()` exposes these reactive getters:
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `state` | `LogoSoupState` | Raw state snapshot from the engine |
+| `isLoading` | `boolean` | `true` while images are being loaded |
+| `isReady` | `boolean` | `true` when normalization is complete |
+| `normalizedLogos` | `NormalizedLogo[]` | The processed logos |
+| `error` | `Error \| null` | Set if all images fail to load |
+
+And these methods:
+
+| Method | Description |
+| --- | --- |
+| `process(options)` | Trigger a processing run with new options |
+| `destroy()` | Clean up blob URLs and cancel in-flight work |
+
+## Reactive Options
+
+Since `$effect` auto-tracks any reactive state (`$state`, `$derived`, `$props`) read inside it, changing any option value automatically re-triggers processing:
+
+```svelte
+<script>
+  import { createLogoSoup } from "@sanity-labs/logo-soup/svelte";
+
+  let logos = $state(["/logos/acme.svg", "/logos/globex.svg"]);
+  let baseSize = $state(48);
+
+  const soup = createLogoSoup();
+
+  $effect(() => {
+    // Re-runs whenever `logos` or `baseSize` changes
+    soup.process({ logos, baseSize });
+  });
+
+  $effect(() => {
+    return () => soup.destroy();
+  });
+
+  function addLogo(src) {
+    logos = [...logos, src];
+    // $effect above re-runs automatically
+  }
+</script>
+
+<button onclick={() => addLogo("/logos/new.svg")}>Add logo</button>
+<button onclick={() => baseSize = baseSize === 48 ? 64 : 48}>Toggle size</button>
+
+{#if soup.isReady}
+  {#each soup.normalizedLogos as logo (logo.src)}
+    <img
+      src={logo.src}
+      alt={logo.alt}
+      width={logo.normalizedWidth}
+      height={logo.normalizedHeight}
+    />
+  {/each}
+{/if}
+```
+
+## Dark Mode with Background Color
+
+When displaying logos on a dark background, pass `backgroundColor` so Logo Soup can properly detect contrast and apply irradiation compensation:
+
+```svelte
+<script>
+  import { createLogoSoup } from "@sanity-labs/logo-soup/svelte";
+
+  let { logos = [] } = $props();
+  let isDark = $state(false);
+
+  const soup = createLogoSoup();
+
+  $effect(() => {
+    soup.process({
+      logos,
+      backgroundColor: isDark ? "#1a1a1a" : "#ffffff",
+    });
+  });
+
+  $effect(() => {
+    return () => soup.destroy();
+  });
+</script>
+```
+
+## Visual Center Alignment
+
+Apply visual center alignment with the `getVisualCenterTransform` helper from the core package:
+
+```svelte
+<script>
+  import { createLogoSoup } from "@sanity-labs/logo-soup/svelte";
+  import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+  // ...setup...
+</script>
+
+{#each soup.normalizedLogos as logo (logo.src)}
+  <img
+    src={logo.src}
+    alt={logo.alt}
+    width={logo.normalizedWidth}
+    height={logo.normalizedHeight}
+    style:transform={getVisualCenterTransform(logo, "visual-center-y")}
+  />
+{/each}
+```
+
+The function returns a CSS transform string like `translate(0px, -2.3px)` or `undefined` if no offset is needed.
+
+## Reusable Component
+
+Wrap it in a reusable Svelte component:
+
+```svelte
+<!-- LogoSoup.svelte -->
+<script>
+  import { createLogoSoup } from "@sanity-labs/logo-soup/svelte";
+  import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+  let {
+    logos = [],
+    baseSize = 48,
+    scaleFactor = 0.5,
+    alignBy = "visual-center-y",
+    gap = 28,
+    ...rest
+  } = $props();
+
+  const soup = createLogoSoup();
+
+  $effect(() => {
+    soup.process({ logos, baseSize, scaleFactor, ...rest });
+  });
+
+  $effect(() => {
+    return () => soup.destroy();
+  });
+
+  const halfGap = $derived(
+    typeof gap === "number" ? `${gap / 2}px` : `calc(${gap} / 2)`
+  );
+</script>
+
+<div style="text-align: center; text-wrap: balance;">
+  {#each soup.normalizedLogos as logo, i (logo.src + i)}
+    <span
+      style:display="inline-block"
+      style:vertical-align="middle"
+      style:padding={halfGap}
+      style:opacity={soup.isLoading ? 0 : 1}
+      style:transition="opacity 0.2s ease-in-out"
+    >
+      <img
+        src={logo.croppedSrc || logo.src}
+        alt={logo.alt}
+        width={logo.normalizedWidth}
+        height={logo.normalizedHeight}
+        style:display="block"
+        style:object-fit="contain"
+        style:width="{logo.normalizedWidth}px"
+        style:height="{logo.normalizedHeight}px"
+        style:transform={getVisualCenterTransform(logo, alignBy)}
+      />
+    </span>
+  {/each}
+</div>
+```
+
+Usage:
+
+```svelte
+<script>
+  import LogoSoup from "./LogoSoup.svelte";
+</script>
+
+<LogoSoup
+  logos={["/logos/acme.svg", "/logos/globex.svg", "/logos/initech.svg"]}
+  baseSize={48}
+  gap={24}
+/>
+```
+
+## How It Works Under the Hood
+
+The Svelte adapter uses `createSubscriber` from `svelte/reactivity` (5.7+) to bridge the core engine's `subscribe`/`getSnapshot` interface into Svelte's runes-based reactivity:
+
+- **`createSubscriber`** returns a function that, when called inside a reactive context (`$effect`, template expression, `$derived`), registers the caller as a subscriber
+- Each **getter** (`isReady`, `normalizedLogos`, etc.) calls `subscribe()` before reading from the engine, making it automatically reactive
+- The engine itself is **not duplicated into `$state`** — it remains the single source of truth, with `createSubscriber` acting as the bridge
+- No legacy store contract (`$:` or `subscribe` method) is used — this is pure Svelte 5 runes

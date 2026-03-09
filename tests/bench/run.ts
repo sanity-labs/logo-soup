@@ -11,15 +11,15 @@ import {
   DEFAULT_CONTRAST_THRESHOLD,
   DEFAULT_DENSITY_FACTOR,
   DEFAULT_SCALE_FACTOR,
-} from "../../src/constants";
-import type { LogoSource, MeasurementResult } from "../../src/types";
-import { getVisualCenterTransform } from "../../src/utils/getVisualCenterTransform";
+} from "../../src/core/constants";
+import type { LogoSource, MeasurementResult } from "../../src/core/types";
+import { getVisualCenterTransform } from "../../src/core/get-visual-center-transform";
 import {
   cropToDataUrl,
   measureImage,
   measureWithContentDetection,
-} from "../../src/utils/measure";
-import { createNormalizedLogo } from "../../src/utils/normalize";
+} from "../../src/core/measure";
+import { createNormalizedLogo } from "../../src/core/normalize";
 import { fmtCost, fmtNs, fmtP, welchTTest } from "./welch";
 
 const origCreateElement = document.createElement.bind(document);

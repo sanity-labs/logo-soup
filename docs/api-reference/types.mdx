@@ -1,0 +1,362 @@
+---
+title: Types
+description: All TypeScript types exported by @sanity-labs/logo-soup.
+---
+
+All types are exported from the root `@sanity-labs/logo-soup` package. Framework-specific types are exported from their respective subpaths.
+
+```ts
+import type {
+  AlignmentMode,
+  BackgroundColor,
+  BoundingBox,
+  LogoSoupEngine,
+  LogoSoupState,
+  LogoSource,
+  MeasurementResult,
+  NormalizedLogo,
+  ProcessOptions,
+  VisualCenter,
+} from "@sanity-labs/logo-soup";
+```
+
+## Core Types
+
+### `LogoSource`
+
+Represents a logo input. Can be a plain URL string or an object with `src` and optional `alt`.
+
+```ts
+type LogoSource = {
+  src: string;
+  alt?: string;
+};
+```
+
+When a plain string is passed in the `logos` array, it's internally normalized to `{ src: string, alt: "" }`.
+
+### `NormalizedLogo`
+
+The result of processing a single logo. Contains the original image info, detected content bounds, and computed display dimensions.
+
+```ts
+type NormalizedLogo = {
+  src: string;
+  alt: string;
+  originalWidth: number;
+  originalHeight: number;
+  contentBox?: BoundingBox;
+  normalizedWidth: number;
+  normalizedHeight: number;
+  aspectRatio: number;
+  pixelDensity?: number;
+  visualCenter?: VisualCenter;
+  croppedSrc?: string;
+};
+```
+
+| Field | Description |
+| --- | --- |
+| `src` | Original image URL |
+| `alt` | Alt text (empty string if not provided) |
+| `originalWidth` | Natural width of the source image in pixels |
+| `originalHeight` | Natural height of the source image in pixels |
+| `contentBox` | Tight bounding rectangle around detected content pixels. Absent if content detection wasn't performed. |
+| `normalizedWidth` | Computed display width after normalization |
+| `normalizedHeight` | Computed display height after normalization |
+| `aspectRatio` | Content aspect ratio (`contentWidth / contentHeight`) |
+| `pixelDensity` | Visual weight measurement (0–1). Present when `densityAware` is enabled. |
+| `visualCenter` | Visual weight center with offset from geometric center. Used by `getVisualCenterTransform`. |
+| `croppedSrc` | Blob URL of the cropped image. Present when `cropToContent` is enabled and the logo has a `contentBox`. |
+
+### `BoundingBox`
+
+A rectangle within an image, in source image pixels.
+
+```ts
+type BoundingBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+```
+
+### `VisualCenter`
+
+The visual weight center of a logo, computed during content detection.
+
+```ts
+type VisualCenter = {
+  x: number;
+  y: number;
+  offsetX: number;
+  offsetY: number;
+};
+```
+
+| Field | Description |
+| --- | --- |
+| `x` | Absolute X position of the visual center in source image pixels |
+| `y` | Absolute Y position of the visual center in source image pixels |
+| `offsetX` | Horizontal displacement from the geometric center of the content box (positive = right of center) |
+| `offsetY` | Vertical displacement from the geometric center of the content box (positive = below center) |
+
+The `offsetX` and `offsetY` values are what `getVisualCenterTransform` uses to compute the CSS `translate()` correction.
+
+### `AlignmentMode`
+
+Controls which axes `getVisualCenterTransform` compensates for.
+
+```ts
+type AlignmentMode =
+  | "bounds"
+  | "visual-center"
+  | "visual-center-x"
+  | "visual-center-y";
+```
+
+| Mode | Description |
+| --- | --- |
+| `"bounds"` | No visual center compensation. Align by geometric bounding box center. |
+| `"visual-center"` | Compensate on both X and Y axes. |
+| `"visual-center-x"` | Compensate horizontally only. |
+| `"visual-center-y"` | Compensate vertically only. Default for most use cases. |
+
+### `BackgroundColor`
+
+The background color for contrast detection and irradiation compensation.
+
+```ts
+type BackgroundColor = CSSColor | [number, number, number];
+```
+
+Where `CSSColor` accepts hex strings (`"#1a1a1a"`), `rgb()`/`rgba()` functions, `hsl()`/`hsla()` functions, or any CSS color string. The `[number, number, number]` tuple form accepts raw RGB values (0–255).
+
+### `MeasurementResult`
+
+Raw measurement data produced by the content detection engine. This is an internal type that you typically don't interact with directly, but it's exported for advanced use cases.
+
+```ts
+type MeasurementResult = {
+  width: number;
+  height: number;
+  contentBox?: BoundingBox;
+  pixelDensity?: number;
+  visualCenter?: VisualCenter;
+  backgroundLuminance?: number;
+};
+```
+
+| Field | Description |
+| --- | --- |
+| `width` | Natural width of the source image |
+| `height` | Natural height of the source image |
+| `contentBox` | Detected content bounds |
+| `pixelDensity` | Visual weight (0–1), present when `densityAware` is enabled |
+| `visualCenter` | Visual weight center |
+| `backgroundLuminance` | Background brightness (0–1), present for opaque images. Used for irradiation compensation. |
+
+## Engine Types
+
+### `LogoSoupEngine`
+
+The interface returned by `createLogoSoup()`.
+
+```ts
+type LogoSoupEngine = {
+  process(options: ProcessOptions): void;
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): LogoSoupState;
+  destroy(): void;
+};
+```
+
+See [createLogoSoup](/api-reference/create-logo-soup) for detailed method documentation.
+
+### `LogoSoupState`
+
+Immutable state snapshot returned by `engine.getSnapshot()`.
+
+```ts
+type LogoSoupState = {
+  status: "idle" | "loading" | "ready" | "error";
+  normalizedLogos: NormalizedLogo[];
+  error: Error | null;
+};
+```
+
+### `ProcessOptions`
+
+Options passed to `engine.process()`. All fields except `logos` are optional and have sensible defaults.
+
+```ts
+type ProcessOptions = {
+  logos: (string | LogoSource)[];
+  baseSize?: number;
+  scaleFactor?: number;
+  contrastThreshold?: number;
+  densityAware?: boolean;
+  densityFactor?: number;
+  cropToContent?: boolean;
+  backgroundColor?: BackgroundColor;
+};
+```
+
+See [Options Reference](/options) for detailed descriptions and default values.
+
+## React Types
+
+Exported from `@sanity-labs/logo-soup/react`:
+
+```ts
+import type {
+  ImageRenderProps,
+  LogoSoupProps,
+  RenderImageFn,
+  UseLogoSoupOptions,
+  UseLogoSoupResult,
+} from "@sanity-labs/logo-soup/react";
+```
+
+### `UseLogoSoupOptions`
+
+Options accepted by the React `useLogoSoup` hook. Same fields as `ProcessOptions`.
+
+```ts
+type UseLogoSoupOptions = {
+  logos: (string | LogoSource)[];
+  baseSize?: number;
+  scaleFactor?: number;
+  contrastThreshold?: number;
+  densityAware?: boolean;
+  densityFactor?: number;
+  cropToContent?: boolean;
+  backgroundColor?: BackgroundColor;
+};
+```
+
+### `UseLogoSoupResult`
+
+Return value of the React `useLogoSoup` hook.
+
+```ts
+type UseLogoSoupResult = {
+  isLoading: boolean;
+  isReady: boolean;
+  normalizedLogos: NormalizedLogo[];
+  error: Error | null;
+};
+```
+
+### `LogoSoupProps`
+
+Props accepted by the React `<LogoSoup>` component. Extends `UseLogoSoupOptions` with layout and rendering options.
+
+```ts
+type LogoSoupProps = {
+  logos: (string | LogoSource)[];
+  baseSize?: number;
+  scaleFactor?: number;
+  contrastThreshold?: number;
+  densityAware?: boolean;
+  densityFactor?: number;
+  cropToContent?: boolean;
+  backgroundColor?: BackgroundColor;
+  alignBy?: AlignmentMode;
+  gap?: number | string;
+  renderImage?: RenderImageFn;
+  className?: string;
+  style?: CSSProperties;
+  onNormalized?: (logos: NormalizedLogo[]) => void;
+};
+```
+
+### `ImageRenderProps`
+
+Props passed to the `renderImage` callback. Extends `ImgHTMLAttributes<HTMLImageElement>` with required fields.
+
+```ts
+type ImageRenderProps = ImgHTMLAttributes<HTMLImageElement> & {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  style?: CSSProperties;
+};
+```
+
+### `RenderImageFn`
+
+The type of the `renderImage` prop.
+
+```ts
+type RenderImageFn = (props: ImageRenderProps) => ReactNode;
+```
+
+## Vue Types
+
+Exported from `@sanity-labs/logo-soup/vue`:
+
+```ts
+import type {
+  UseLogoSoupOptions,
+  UseLogoSoupReturn,
+} from "@sanity-labs/logo-soup/vue";
+```
+
+### `UseLogoSoupOptions` (Vue)
+
+Options accepted by the Vue `useLogoSoup` composable. Each field accepts a plain value, a `Ref`, or a getter function (`MaybeRefOrGetter`).
+
+```ts
+type UseLogoSoupOptions = {
+  logos: MaybeRefOrGetter<(string | LogoSource)[]>;
+  baseSize?: MaybeRefOrGetter<number | undefined>;
+  scaleFactor?: MaybeRefOrGetter<number | undefined>;
+  contrastThreshold?: MaybeRefOrGetter<number | undefined>;
+  densityAware?: MaybeRefOrGetter<boolean | undefined>;
+  densityFactor?: MaybeRefOrGetter<number | undefined>;
+  cropToContent?: MaybeRefOrGetter<boolean | undefined>;
+  backgroundColor?: MaybeRefOrGetter<BackgroundColor | undefined>;
+};
+```
+
+### `UseLogoSoupReturn`
+
+Return value of the Vue `useLogoSoup` composable.
+
+```ts
+type UseLogoSoupReturn = {
+  state: ShallowRef<LogoSoupState>;
+  isLoading: ComputedRef<boolean>;
+  isReady: ComputedRef<boolean>;
+  normalizedLogos: ComputedRef<NormalizedLogo[]>;
+  error: ComputedRef<Error | null>;
+};
+```
+
+## Solid Types
+
+Exported from `@sanity-labs/logo-soup/solid`:
+
+```ts
+import type { UseLogoSoupResult } from "@sanity-labs/logo-soup/solid";
+```
+
+### `UseLogoSoupResult` (Solid)
+
+Return value of the Solid `useLogoSoup` primitive. Properties are reactive getters.
+
+```ts
+type UseLogoSoupResult = {
+  readonly isLoading: boolean;
+  readonly isReady: boolean;
+  readonly normalizedLogos: NormalizedLogo[];
+  readonly error: Error | null;
+};
+```
+
+<Note>
+  The Solid `useLogoSoup` accepts a getter function `() => ProcessOptions` as its argument, not a plain options object. This is the standard Solid pattern for reactive props.
+</Note>

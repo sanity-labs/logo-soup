@@ -3,7 +3,7 @@ import type {
   BoundingBox,
   MeasurementResult,
   VisualCenter,
-} from "../types";
+} from "./types";
 
 function createReusableCanvas(
   options?: CanvasRenderingContext2DSettings,

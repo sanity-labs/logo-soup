@@ -1,6 +1,6 @@
 import type { CSSProperties, ImgHTMLAttributes } from "react";
-import { LogoSoup } from "../src/components/LogoSoup";
-import type { LogoSoupProps } from "../src/types";
+import { LogoSoup } from "../src/react/logo-soup";
+import type { LogoSoupProps } from "../src/react/types";
 import {
   DEFAULT_ALIGN_BY,
   DEFAULT_BASE_SIZE,
@@ -8,7 +8,7 @@ import {
   DEFAULT_DENSITY_FACTOR,
   DEFAULT_GAP,
   DEFAULT_SCALE_FACTOR,
-} from "../src/constants";
+} from "../src/core/constants";
 
 const logoNames = [
   "aether",

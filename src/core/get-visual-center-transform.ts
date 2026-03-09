@@ -1,5 +1,5 @@
-import { DEFAULT_ALIGN_BY } from "../constants";
-import type { AlignmentMode, NormalizedLogo } from "../types";
+import { DEFAULT_ALIGN_BY } from "./constants";
+import type { AlignmentMode, NormalizedLogo } from "./types";
 
 export function getVisualCenterTransform(
   logo: NormalizedLogo,
