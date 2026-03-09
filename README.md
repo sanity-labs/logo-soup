@@ -1,5 +1,7 @@
 # 🍜 Logo Soup
 
+[![npm version](https://img.shields.io/npm/v/@sanity-labs/logo-soup.svg?style=flat-square)](https://www.npmjs.com/package/@sanity-labs/logo-soup)
+
 A tiny framework-agnostic library that makes logos look good together. Works with React, Vue, Svelte, Solid, Angular, and vanilla JavaScript.
 
 ![Logos without normalization — different sizes, weights, and aspect ratios create visual chaos](static/docs/before.png)
