@@ -1,5 +1,11 @@
 # @sanity-labs/logo-soup
 
+## 1.1.0
+
+### Minor Changes
+
+- [#30](https://github.com/sanity-labs/logo-soup/pull/30) [`39a6e18`](https://github.com/sanity-labs/logo-soup/commit/39a6e1899b6c5911563bc4f3943b1bdec11ad846) Thanks [@RostiMelk](https://github.com/RostiMelk)! - Add jQuery 4.x adapter via `@sanity-labs/logo-soup/jquery`. Provides a `$.fn.logoSoup` plugin with `process`, `ready`, `destroy`, and `instance` methods. Auto-installs onto `window.jQuery` if available, or call `install($)` manually with a bundler.
+
 ## 2.0.0
 
 ### Major Changes
