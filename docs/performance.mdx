@@ -1,0 +1,127 @@
+---
+title: Performance
+description: How Logo Soup stays fast, what we measure, and how to optimize for your use case.
+---
+
+Logo Soup runs entirely client-side, analyzing pixel data on a `<canvas>`. That means performance matters. Here's what we did to make it fast, how we measure it, and what you can do to keep it that way.
+
+## Optimization techniques
+
+### Single-pass pixel scanning
+
+Early versions ran three separate pixel scans per logo: one for the bounding box, one for the visual center, and one for pixel density. Each scan created a new canvas, drew the image at full resolution, then walked every pixel. For a 400x400 image, that's 160k pixels, three times over.
+
+The current implementation collapses all three into a single pass over a `Uint32Array`:
+
+```ts
+for (let i = 0; i < pixelCount; i++) {
+  const pixel = data32[i]!;
+
+  // unpack RGBA from Uint32Array (little-endian)
+  const a = pixel >>> 24;
+  if (a <= contrastThreshold) continue;
+
+  const r = pixel & 0xff;
+  const g = (pixel >>> 8) & 0xff;
+  const b = (pixel >>> 16) & 0xff;
+
+  // squared euclidean distance from background
+  const distSq = (r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2;
+  if (distSq < contrastDistanceSq) continue;
+
+  // recover x,y from flat index
+  const x = i % sw;
+  const y = (i - x) / sw;
+
+  // accumulate weighted visual center
+  totalWeight += distSq * a;
+  weightedX += (x + 0.5) * distSq * a;
+  weightedY += (y + 0.5) * distSq * a;
+}
+```
+
+One loop computes the content bounds, weighted visual center, and pixel density simultaneously. Combined with the downsampling and canvas reuse described below, this cut content detection from **1.4ms to ~37us per logo** (38x faster) and full mount from **29ms to ~850us for 20 logos** (35x faster).
+
+### Downsampling
+
+Source images are drawn onto a canvas at a fixed pixel budget of ~2,048 total pixels, regardless of the original resolution. A 2000x1000 image is analyzed at roughly 45x23 pixels. This makes measurement cost O(1) relative to image resolution while preserving enough detail for accurate content detection.
+
+### Canvas reuse
+
+Instead of creating a new `<canvas>` element for each measurement, the engine maintains pooled canvas contexts at module level. The canvas is only resized when the dimensions change, otherwise it's cleared and reused. This avoids repeated DOM allocation and garbage collection pressure.
+
+### Result caching
+
+Once an image is loaded and measured, the `MeasurementResult` is cached by URL. Changing `baseSize` or `scaleFactor` (which only affect normalization math, not pixel analysis) reuses cached measurements without re-scanning. The cache is only invalidated when `contrastThreshold`, `densityAware`, or `backgroundColor` change, since those affect the pixel scan itself.
+
+### Cancellation
+
+If `process()` is called while a previous run is still loading images, the in-flight work is cancelled and only the latest call's results are emitted. This prevents wasted work during rapid option changes.
+
+## Benchmarks
+
+Every pull request automatically runs a benchmark suite against real SVG logos from the test set. Here are typical numbers from CI:
+
+| Benchmark | Time |
+|:----------|-----:|
+| Content detection (1 logo) | ~36us |
+| Render pass (20 logos) | ~1us |
+| Full mount, no detection (20 logos) | ~3.5us |
+| Full mount, defaults (20 logos) | ~880us |
+
+Detection dominates the cost. Once measurements are cached, subsequent layout updates (changing `baseSize`, `scaleFactor`, or `alignBy`) are effectively free -- nearly 400x faster than a full mount.
+
+### Feature cost breakdown
+
+The CI suite also measures how expensive individual features are relative to having them off:
+
+| Feature | On | Off | Cost |
+|:--------|---:|----:|:-----|
+| `densityAware` | ~35us | ~34us | Negligible (same pass) |
+| `alignBy: "visual-center-y"` vs `"bounds"` | ~1us | ~59ns | 18x (but both are sub-microsecond) |
+| `cropToContent` | ~2ms | ~0ns | 2ms (canvas crop + blob URL) |
+| Layout update: full mount vs cached | ~880us | ~2us | 400x (pixel scan vs pure math) |
+
+## CI regression detection
+
+The benchmark suite uses [Welch's t-test](https://en.wikipedia.org/wiki/Welch%27s_t-test) to compare HEAD against the base branch on every PR. A regression is flagged only when all three conditions are met:
+
+1. The change is **statistically significant** (p < 0.05)
+2. The relative change exceeds **5%**
+3. The absolute change exceeds **100us**
+
+This avoids false positives from measurement noise while catching real regressions. The comparison table and feature cost breakdown are posted directly on the PR as a comment, along with a link to the full CI job logs.
+
+<Tip>
+  You can run benchmarks locally with `bun run bench`. The suite uses `@napi-rs/canvas` and `@happy-dom/global-registrator` to run the same pixel scanning code outside a browser.
+</Tip>
+
+## Tips for your application
+
+### Provide `backgroundColor` for opaque logos
+
+When Logo Soup doesn't know the background color, it samples the image perimeter to auto-detect it. If you know the background (e.g., your page is white), pass `backgroundColor` explicitly to skip the detection step and improve accuracy.
+
+### Disable features you don't need
+
+Each feature has a measurable cost. If you don't need density compensation, visual center alignment, or content cropping, turning them off saves work:
+
+| Feature | Effect when disabled |
+|:--------|:---------------------|
+| `densityAware: false` | Skips density computation during pixel scan |
+| `alignBy: "bounds"` | Skips visual center transform calculation |
+| `cropToContent: false` | Skips canvas crop and blob URL creation (saves ~2ms/logo) |
+
+### Cache-friendly option changes
+
+Changing `baseSize`, `scaleFactor`, `densityFactor`, or `alignBy` reuses cached measurements and only runs cheap normalization math. Changing `contrastThreshold`, `densityAware`, or `backgroundColor` invalidates the cache and triggers a full re-scan. Structure your UI so the expensive options are set once and the cheap ones are interactive.
+
+### Keep logo sets reasonable
+
+The library processes logos in parallel using `Promise.allSettled`, but each logo still needs its own pixel scan on first load. For very large sets (50+ logos), consider lazy-loading logos that are off-screen.
+
+## Server-side pre-computation
+
+All processing currently happens client-side. For scenarios where you want to avoid any client-side pixel scanning (static sites, SSR, build-time optimization), we're exploring a Node.js adapter that would pre-compute `MeasurementResult` data using `@napi-rs/canvas`, letting you ship pre-measured data and skip detection entirely at runtime.
+
+The benchmark suite already proves this works -- it runs the same `measureWithContentDetection` code server-side using `@napi-rs/canvas` as the canvas backend. Follow the [GitHub repo](https://github.com/sanity-labs/logo-soup) for updates.
