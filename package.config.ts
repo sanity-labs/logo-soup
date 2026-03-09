@@ -17,5 +17,6 @@ export default defineConfig({
     "svelte/reactivity",
     "solid-js",
     "@angular/core",
+    "jquery",
   ],
 });

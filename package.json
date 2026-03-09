@@ -36,6 +36,11 @@
       "import": "./dist/angular/index.js",
       "default": "./dist/angular/index.js"
     },
+    "./jquery": {
+      "source": "./src/jquery/index.ts",
+      "import": "./dist/jquery/index.js",
+      "default": "./dist/jquery/index.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -63,6 +68,10 @@
       "./angular": {
         "import": "./dist/angular/index.js",
         "default": "./dist/angular/index.js"
+      },
+      "./jquery": {
+        "import": "./dist/jquery/index.js",
+        "default": "./dist/jquery/index.js"
       },
       "./package.json": "./package.json"
     }
@@ -118,8 +127,10 @@
     "@storybook/react-vite": "^10.2.8",
     "@testing-library/react": "^16",
     "@types/bun": "latest",
+    "@types/jquery": "^4.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "jquery": "4",
     "react": "^19",
     "react-dom": "^19",
     "solid-js": "^1.9",
@@ -135,6 +146,7 @@
     "svelte": "^5",
     "solid-js": "^1.9",
     "@angular/core": "^19 || ^20 || ^21",
+    "jquery": "^4",
     "typescript": "^5"
   },
   "peerDependenciesMeta": {
@@ -154,6 +166,9 @@
       "optional": true
     },
     "@angular/core": {
+      "optional": true
+    },
+    "jquery": {
       "optional": true
     },
     "typescript": {

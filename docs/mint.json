@@ -46,10 +46,7 @@
   "navigation": [
     {
       "group": "Get Started",
-      "pages": [
-        "introduction",
-        "quickstart"
-      ]
+      "pages": ["introduction", "quickstart"]
     },
     {
       "group": "Frameworks",
@@ -59,15 +56,13 @@
         "frameworks/svelte",
         "frameworks/solid",
         "frameworks/angular",
+        "frameworks/jquery",
         "frameworks/vanilla"
       ]
     },
     {
       "group": "Guides",
-      "pages": [
-        "options",
-        "how-it-works"
-      ]
+      "pages": ["options", "how-it-works"]
     },
     {
       "group": "API Reference",

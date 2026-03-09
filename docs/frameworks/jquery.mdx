@@ -1,0 +1,206 @@
+---
+title: jQuery
+description: Use Logo Soup with jQuery 4.x via the $.fn.logoSoup plugin.
+---
+
+## Install
+
+```bash
+npm install @sanity-labs/logo-soup jquery@4
+```
+
+Requires jQuery 4.0 or later.
+
+## Setup
+
+The plugin needs to be installed onto jQuery. There are two ways to do this:
+
+### Auto-install (global jQuery)
+
+If jQuery is available on `window`, the plugin installs itself automatically on import:
+
+```html
+<script src="https://code.jquery.com/jquery-4.0.0.min.js"></script>
+<script type="module">
+  import "@sanity-labs/logo-soup/jquery";
+
+  $("#logos").logoSoup({
+    logos: ["/logos/acme.svg", "/logos/globex.svg"],
+  });
+</script>
+```
+
+### Manual install (ES modules)
+
+When using a bundler, import and call `install` with your jQuery instance:
+
+```ts
+import $ from "jquery";
+import { install } from "@sanity-labs/logo-soup/jquery";
+
+install($);
+```
+
+## Basic Usage
+
+```ts
+$("#logos").logoSoup({
+  logos: [
+    { src: "/logos/acme.svg", alt: "Acme Corp" },
+    { src: "/logos/globex.svg", alt: "Globex" },
+    { src: "/logos/initech.svg", alt: "Initech" },
+  ],
+  baseSize: 48,
+  gap: 28,
+  alignBy: "visual-center-y",
+});
+```
+
+The plugin renders normalized `<img>` elements into the selected container with visual center alignment and a fade-in transition.
+
+## Plugin Options
+
+All [shared options](/options) are supported, plus these jQuery-specific ones:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `alignBy` | `AlignmentMode` | `"visual-center-y"` | How to align logos |
+| `gap` | `number \| string` | `28` | Space between logos |
+| `onReady` | `(logos: NormalizedLogo[]) => void` | — | Callback when normalization completes |
+| `onError` | `(error: Error) => void` | — | Callback when all images fail to load |
+
+## Methods
+
+Call methods on an existing plugin instance using the standard jQuery plugin convention:
+
+### `process`
+
+Update the logos or options on an existing instance:
+
+```ts
+$("#logos").logoSoup("process", {
+  logos: ["/logos/new-logo.svg", "/logos/another.svg"],
+  baseSize: 64,
+});
+```
+
+### `ready`
+
+Returns a native `Promise` that resolves with the normalized logos when processing completes:
+
+```ts
+const logos = await $("#logos").logoSoup("ready");
+console.log(logos.length, "logos normalized");
+```
+
+If logos are already processed, the promise resolves immediately. If processing fails, the promise rejects with the error.
+
+### `destroy`
+
+Removes the plugin instance, cleans up the engine, and empties the container:
+
+```ts
+$("#logos").logoSoup("destroy");
+```
+
+### `instance`
+
+Returns the internal plugin instance (engine, unsubscribe function, current options) for the first matched element. Useful for advanced use cases:
+
+```ts
+const instance = $("#logos").logoSoup("instance");
+const state = instance.engine.getSnapshot();
+```
+
+## Full Example
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://code.jquery.com/jquery-4.0.0.min.js"></script>
+  </head>
+  <body>
+    <div id="logos"></div>
+    <button id="toggle-size">Toggle Size</button>
+    <button id="destroy">Destroy</button>
+
+    <script type="module">
+      import "@sanity-labs/logo-soup/jquery";
+
+      const logos = [
+        { src: "/logos/acme.svg", alt: "Acme Corp" },
+        { src: "/logos/globex.svg", alt: "Globex" },
+        { src: "/logos/initech.svg", alt: "Initech" },
+      ];
+
+      let baseSize = 48;
+
+      $("#logos").logoSoup({
+        logos,
+        baseSize,
+        onReady(normalized) {
+          console.log(`${normalized.length} logos normalized`);
+        },
+      });
+
+      $("#toggle-size").on("click", () => {
+        baseSize = baseSize === 48 ? 64 : 48;
+        $("#logos").logoSoup("process", { logos, baseSize });
+      });
+
+      $("#destroy").on("click", () => {
+        $("#logos").logoSoup("destroy");
+      });
+    </script>
+  </body>
+</html>
+```
+
+## Dark Mode
+
+Pass `backgroundColor` for proper contrast detection on opaque logos:
+
+```ts
+const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+$("#logos").logoSoup({
+  logos,
+  backgroundColor: isDark ? "#1a1a1a" : "#ffffff",
+});
+```
+
+## Chaining
+
+The plugin supports standard jQuery chaining for initialization, `process`, and `destroy`:
+
+```ts
+$("#logos")
+  .logoSoup({ logos, baseSize: 48 })
+  .addClass("logo-strip")
+  .css("padding", "20px");
+```
+
+The `ready` method breaks the chain since it returns a `Promise` instead of a jQuery object.
+
+## Re-initialization
+
+Calling `.logoSoup({...})` on an element that already has an instance automatically destroys the old instance and creates a new one:
+
+```ts
+// First init
+$("#logos").logoSoup({ logos: firstLogos });
+
+// Re-init with different logos — old engine is cleaned up
+$("#logos").logoSoup({ logos: secondLogos });
+```
+
+## How It Works Under the Hood
+
+The jQuery adapter is a standard `$.fn` plugin that:
+
+- Stores the engine instance via `$.data()` on each element
+- Subscribes to the engine's state changes and renders `<img>` elements into the container using DOM APIs
+- Applies `getVisualCenterTransform` for visual center alignment
+- Uses native `Promise` for the `ready` method (jQuery 4 slim build dropped Deferreds in favor of native Promises)
+- Cleans up blob URLs and subscriptions on `destroy`

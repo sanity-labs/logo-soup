@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@sanity-labs/logo-soup.svg?style=flat-square)](https://www.npmjs.com/package/@sanity-labs/logo-soup)
 
-A tiny framework-agnostic library that makes logos look good together. Works with React, Vue, Svelte, Solid, Angular, and vanilla JavaScript.
+A tiny framework-agnostic library that makes logos look good together. Works with React, Vue, Svelte, Solid, Angular, jQuery, and vanilla JavaScript.
 
 ![Logos without normalization — different sizes, weights, and aspect ratios create visual chaos](static/docs/before.png)
 
@@ -229,6 +229,36 @@ export class LogoStripComponent {
 
 `LogoSoupService` is an `@Injectable` scoped per component instance via `providers`. It uses Angular signals internally and cleans up automatically via `DestroyRef`.
 
+### jQuery
+
+```ts
+import $ from "jquery";
+import { install } from "@sanity-labs/logo-soup/jquery";
+
+install($);
+
+$("#logos").logoSoup({
+  logos: [
+    { src: "/logos/acme.svg", alt: "Acme Corp" },
+    { src: "/logos/globex.svg", alt: "Globex" },
+    { src: "/logos/initech.svg", alt: "Initech" },
+  ],
+  baseSize: 48,
+  alignBy: "visual-center-y",
+});
+
+// Update logos
+$("#logos").logoSoup("process", { logos: newLogos });
+
+// Get normalized logos as a native Promise
+const logos = await $("#logos").logoSoup("ready");
+
+// Destroy
+$("#logos").logoSoup("destroy");
+```
+
+Auto-installs onto `window.jQuery` if available. Uses `$.data()` for instance storage, native `Promise` for the `ready` method (jQuery 4 dropped Deferreds from the slim build), and supports standard jQuery chaining.
+
 ### Vanilla JavaScript
 
 Use the core engine directly, no framework needed:
@@ -325,6 +355,7 @@ The library is a single package with subpath exports:
 @sanity-labs/logo-soup/svelte   → createLogoSoup (runes-compatible)
 @sanity-labs/logo-soup/solid    → useLogoSoup primitive
 @sanity-labs/logo-soup/angular  → LogoSoupService (Injectable)
+@sanity-labs/logo-soup/jquery   → $.fn.logoSoup plugin
 ```
 
 The core `createLogoSoup()` engine handles all image loading, measurement, normalization, caching, and cancellation. Each framework adapter is a thin wrapper (30-80 lines) that bridges the engine's `subscribe`/`getSnapshot` interface into the framework's reactivity model. Tree-shaking ensures a React consumer never pulls in Vue/Svelte/Solid/Angular code, and vice versa.
