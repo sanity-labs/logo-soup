@@ -47,7 +47,7 @@
       },
       {
         "group": "Guides",
-        "pages": ["options", "how-it-works"]
+        "pages": ["options", "how-it-works", "performance"]
       },
       {
         "group": "Reference",
