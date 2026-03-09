@@ -47,6 +47,10 @@ jobs:
           node-version: lts/*
           registry-url: https://registry.npmjs.org
 
+      # npm 11.5.1+ required for OIDC trusted publishing
+      - name: Update npm for trusted publishing (OIDC)
+        run: npm install -g npm@latest
+
       - run: bun install --frozen-lockfile
 
       - run: bun run build
@@ -60,5 +64,4 @@ jobs:
           setupGitUser: false
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
