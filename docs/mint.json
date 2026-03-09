@@ -57,7 +57,8 @@
         "frameworks/solid",
         "frameworks/angular",
         "frameworks/jquery",
-        "frameworks/vanilla"
+        "frameworks/vanilla",
+        "frameworks/custom"
       ]
     },
     {

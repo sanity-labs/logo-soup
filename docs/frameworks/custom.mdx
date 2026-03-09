@@ -1,0 +1,215 @@
+---
+title: Build Your Own Adapter
+description: Integrate Logo Soup with any framework using the core engine's subscribe/getSnapshot API.
+---
+
+Every first-party adapter follows the same pattern. If your framework isn't listed, you can build an adapter in 20-40 lines.
+
+## The Pattern
+
+```ts
+import { createLogoSoup } from "@sanity-labs/logo-soup";
+
+// 1. Create an engine instance
+const engine = createLogoSoup();
+
+// 2. Subscribe — push snapshots into your framework's reactivity
+const unsubscribe = engine.subscribe(() => {
+  const snapshot = engine.getSnapshot();
+  // yourFramework.setState(snapshot)
+});
+
+// 3. Process — call when options change
+engine.process({ logos: ["a.svg", "b.svg"], baseSize: 48 });
+
+// 4. Destroy — call on teardown
+unsubscribe();
+engine.destroy();
+```
+
+## Example: Preact 10.x
+
+Preact exposes `useSyncExternalStore` via `preact/compat` — the same API React uses. The adapter is nearly identical to the React one.
+
+```tsx
+// use-logo-soup.ts
+import { useRef, useCallback, useEffect } from "preact/hooks";
+import { useSyncExternalStore } from "preact/compat";
+import { createLogoSoup } from "@sanity-labs/logo-soup";
+import type { ProcessOptions, LogoSoupState } from "@sanity-labs/logo-soup";
+
+const SERVER_SNAPSHOT: LogoSoupState = {
+  status: "idle",
+  normalizedLogos: [],
+  error: null,
+};
+
+export function useLogoSoup(options: ProcessOptions) {
+  const engineRef = useRef(createLogoSoup());
+  const engine = engineRef.current;
+
+  const subscribe = useCallback(
+    (cb: () => void) => engine.subscribe(cb),
+    [engine],
+  );
+  const getSnapshot = useCallback(() => engine.getSnapshot(), [engine]);
+
+  const state = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    () => SERVER_SNAPSHOT,
+  );
+
+  useEffect(() => {
+    engine.process(options);
+  }, [engine, options.logos, options.baseSize, options.scaleFactor]);
+
+  useEffect(() => () => engine.destroy(), [engine]);
+
+  return state;
+}
+```
+
+```tsx
+// usage
+import { useLogoSoup } from "./use-logo-soup";
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+
+function LogoStrip() {
+  const { status, normalizedLogos } = useLogoSoup({
+    logos: ["/logos/acme.svg", "/logos/globex.svg"],
+  });
+
+  if (status !== "ready") return null;
+
+  return (
+    <div style={{ textAlign: "center" }}>
+      {normalizedLogos.map((logo) => (
+        <img
+          key={logo.src}
+          src={logo.src}
+          alt={logo.alt}
+          width={logo.normalizedWidth}
+          height={logo.normalizedHeight}
+          style={{
+            transform: getVisualCenterTransform(logo, "visual-center-y"),
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+## Example: Lit 3.x
+
+Lit uses `ReactiveController` to encapsulate reusable logic that hooks into a component's update cycle. The controller subscribes to the engine and calls `host.requestUpdate()` when state changes.
+
+```ts
+// logo-soup-controller.ts
+import { type ReactiveController, type ReactiveControllerHost } from "lit";
+import { createLogoSoup } from "@sanity-labs/logo-soup";
+import type { ProcessOptions, LogoSoupState } from "@sanity-labs/logo-soup";
+
+export class LogoSoupController implements ReactiveController {
+  private engine = createLogoSoup();
+  private unsubscribe: (() => void) | null = null;
+
+  state: LogoSoupState = this.engine.getSnapshot();
+
+  constructor(private host: ReactiveControllerHost) {
+    host.addController(this);
+  }
+
+  hostConnected() {
+    this.unsubscribe = this.engine.subscribe(() => {
+      this.state = this.engine.getSnapshot();
+      this.host.requestUpdate();
+    });
+  }
+
+  hostDisconnected() {
+    this.unsubscribe?.();
+    this.engine.destroy();
+  }
+
+  process(options: ProcessOptions) {
+    this.engine.process(options);
+  }
+}
+```
+
+```ts
+// usage
+import { LitElement, html } from "lit";
+import { customElement, property } from "lit/decorators.js";
+import { getVisualCenterTransform } from "@sanity-labs/logo-soup";
+import { LogoSoupController } from "./logo-soup-controller";
+
+@customElement("logo-strip")
+export class LogoStrip extends LitElement {
+  private soup = new LogoSoupController(this);
+
+  @property({ type: Array }) logos: string[] = [];
+  @property({ type: Number }) baseSize = 48;
+
+  updated(changed: Map<string, unknown>) {
+    if (changed.has("logos") || changed.has("baseSize")) {
+      this.soup.process({ logos: this.logos, baseSize: this.baseSize });
+    }
+  }
+
+  render() {
+    if (this.soup.state.status !== "ready") return html``;
+
+    return html`
+      <div style="text-align: center">
+        ${this.soup.state.normalizedLogos.map(
+          (logo) => html`
+            <img
+              src=${logo.src}
+              alt=${logo.alt}
+              width=${logo.normalizedWidth}
+              height=${logo.normalizedHeight}
+              style="display:inline-block;margin:0 14px;transform:${getVisualCenterTransform(
+                logo,
+                "visual-center-y",
+              ) ?? "none"}"
+            />
+          `,
+        )}
+      </div>
+    `;
+  }
+}
+```
+
+## Checklist
+
+| Concern       | What to do                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| **Create**    | Call `createLogoSoup()` once per component instance                                         |
+| **Subscribe** | Push `engine.getSnapshot()` into your reactive state on each notification                   |
+| **Process**   | Call `engine.process(options)` when inputs change                                           |
+| **Cleanup**   | Call both `unsubscribe()` and `engine.destroy()` on teardown                                |
+| **Stability** | Store the engine in a ref/field — don't recreate it on every render                         |
+| **SSR**       | The engine needs `<canvas>`, so guard behind a client-side check if your framework does SSR |
+
+## How Our First-Party Adapters Map
+
+| Framework | Reactive primitive     | Subscribe mechanism                                | Cleanup                   |
+| --------- | ---------------------- | -------------------------------------------------- | ------------------------- |
+| React     | `useSyncExternalStore` | Engine's `subscribe`/`getSnapshot` directly        | `useEffect` return        |
+| Vue       | `shallowRef`           | `engine.subscribe()` → `ref.value = snapshot`      | `onScopeDispose`          |
+| Svelte    | `createSubscriber`     | Getter calls `subscribe()` before reading          | `$effect` teardown        |
+| Solid     | `from()`               | Producer function `(set) => engine.subscribe(...)` | `onCleanup`               |
+| Angular   | `signal()`             | `engine.subscribe()` → `_state.set(snapshot)`      | `DestroyRef.onDestroy`    |
+| jQuery    | `$.data()`             | `engine.subscribe()` → re-render DOM               | `$el.logoSoup('destroy')` |
+
+Each adapter is 30-80 lines. The source is at [`src/react`](https://github.com/sanity-labs/logo-soup/tree/main/src/react), [`src/vue`](https://github.com/sanity-labs/logo-soup/tree/main/src/vue), [`src/svelte`](https://github.com/sanity-labs/logo-soup/tree/main/src/svelte), [`src/solid`](https://github.com/sanity-labs/logo-soup/tree/main/src/solid), [`src/angular`](https://github.com/sanity-labs/logo-soup/tree/main/src/angular), and [`src/jquery`](https://github.com/sanity-labs/logo-soup/tree/main/src/jquery).
+
+<Tip>
+  Built an adapter for a framework we don't support? [Let us
+  know](https://github.com/sanity-labs/logo-soup/issues) — we'll link to it from
+  the docs.
+</Tip>
