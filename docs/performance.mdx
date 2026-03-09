@@ -122,6 +122,16 @@ The library processes logos in parallel using `Promise.allSettled`, but each log
 
 ## Server-side pre-computation
 
-All processing currently happens client-side. For scenarios where you want to avoid any client-side pixel scanning (static sites, SSR, build-time optimization), we're exploring a Node.js adapter that would pre-compute `MeasurementResult` data using `@napi-rs/canvas`, letting you ship pre-measured data and skip detection entirely at runtime.
+If you want to skip client-side pixel scanning entirely, the [Node.js adapter](/frameworks/node) lets you pre-compute `MeasurementResult` data at build time or in API routes using `@napi-rs/canvas`. The client then calls `createNormalizedLogo` with the pre-computed data -- pure math, no canvas, no async.
 
-The benchmark suite already proves this works -- it runs the same `measureWithContentDetection` code server-side using `@napi-rs/canvas` as the canvas backend. Follow the [GitHub repo](https://github.com/sanity-labs/logo-soup) for updates.
+```ts
+// Build script
+import { measureImages } from "@sanity-labs/logo-soup/node";
+const measurements = await measureImages(["./logos/acme.svg", "./logos/globex.svg"]);
+
+// Client
+import { createNormalizedLogo } from "@sanity-labs/logo-soup";
+const normalized = createNormalizedLogo(source, measurements[0], 48, 0.5, 0.5);
+```
+
+See the [Node.js adapter docs](/frameworks/node) for the full workflow.

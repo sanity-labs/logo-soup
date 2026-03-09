@@ -41,6 +41,11 @@
       "import": "./dist/jquery/index.js",
       "default": "./dist/jquery/index.js"
     },
+    "./node": {
+      "source": "./src/node/index.ts",
+      "import": "./dist/node/index.js",
+      "default": "./dist/node/index.js"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -72,6 +77,10 @@
       "./jquery": {
         "import": "./dist/jquery/index.js",
         "default": "./dist/jquery/index.js"
+      },
+      "./node": {
+        "import": "./dist/node/index.js",
+        "default": "./dist/node/index.js"
       },
       "./package.json": "./package.json"
     }
@@ -149,6 +158,7 @@
     "solid-js": "^1.9",
     "@angular/core": "^19 || ^20 || ^21",
     "jquery": "^4",
+    "@napi-rs/canvas": "^0.1.90",
     "typescript": "^5"
   },
   "peerDependenciesMeta": {
@@ -171,6 +181,9 @@
       "optional": true
     },
     "jquery": {
+      "optional": true
+    },
+    "@napi-rs/canvas": {
       "optional": true
     },
     "typescript": {
