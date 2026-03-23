@@ -1,5 +1,13 @@
 # @sanity-labs/logo-soup
 
+## 1.2.2
+
+### Patch Changes
+
+- [#42](https://github.com/sanity-labs/logo-soup/pull/42) [`8fadbbe`](https://github.com/sanity-labs/logo-soup/commit/8fadbbef66c30153f771d3f392030907820b05d6) Thanks [@RostiMelk](https://github.com/RostiMelk)! - Fixed React `useLogoSoup` hook and `LogoSoup` component getting stuck in loading state when React is running in StrictMode.
+
+  Added `cancel()` method to the engine to separate reversible cancellation from permanent destruction, and reworked the React hook's effect cleanup to follow React's setup → cleanup → setup contract.
+
 ## 1.2.0
 
 ### Minor Changes
