@@ -1,6 +1,6 @@
 {
   "name": "@sanity-labs/logo-soup",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "A tiny framework-agnostic library that makes logos look good together",
   "type": "module",
   "sideEffects": false,
