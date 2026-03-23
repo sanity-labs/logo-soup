@@ -77,6 +77,9 @@ export type LogoSoupEngine = {
   /** Trigger a processing run. Call when inputs change. */
   process(options: ProcessOptions): void;
 
+  /** Cancel in-flight work without tearing down the engine. */
+  cancel(): void;
+
   /** Subscribe to state changes. Returns an unsubscribe function. */
   subscribe(listener: () => void): () => void;
 

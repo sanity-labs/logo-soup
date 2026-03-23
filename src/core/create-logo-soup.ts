@@ -91,12 +91,17 @@ export function createLogoSoup(): LogoSoupEngine {
     }
   }
 
+  /** Cancel in-flight work without tearing down the engine. */
+  function cancel() {
+    cancelCurrent?.();
+    cancelCurrent = null;
+  }
+
   function process(options: ProcessOptions) {
     if (destroyed) return;
 
     // Cancel any in-flight work from a previous process() call
-    cancelCurrent?.();
-    cancelCurrent = null;
+    cancel();
 
     const {
       logos,
@@ -258,11 +263,10 @@ export function createLogoSoup(): LogoSoupEngine {
   function destroy() {
     if (destroyed) return;
     destroyed = true;
-    cancelCurrent?.();
-    cancelCurrent = null;
+    cancel();
     clearCache();
     listeners.clear();
   }
 
-  return { process, subscribe, getSnapshot, destroy };
+  return { process, cancel, subscribe, getSnapshot, destroy };
 }

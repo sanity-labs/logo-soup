@@ -252,6 +252,27 @@ describe("createLogoSoup", () => {
     expect(engine.getSnapshot().status).toBe("idle");
   });
 
+  test("cancel() stops in-flight work without destroying the engine", async () => {
+    installMockImage();
+    const engine = createLogoSoup();
+
+    engine.process({ logos: ["a.png"] });
+    expect(engine.getSnapshot().status).toBe("loading");
+
+    engine.cancel();
+
+    // In-flight work was cancelled — no transition to ready
+    await new Promise((r) => setTimeout(r, 50));
+    expect(engine.getSnapshot().status).toBe("loading");
+
+    // Engine is still alive — a new process() call works
+    engine.process({ logos: ["a.png"] });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(engine.getSnapshot().status).toBe("ready");
+    expect(engine.getSnapshot().normalizedLogos).toHaveLength(1);
+  });
+
   test("snapshot reference changes on state transitions", async () => {
     installMockImage();
     const engine = createLogoSoup();

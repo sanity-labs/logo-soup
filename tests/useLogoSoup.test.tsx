@@ -1,4 +1,5 @@
 import { describe, test, expect } from "bun:test";
+import { StrictMode, type ReactNode } from "react";
 import { renderHook, waitFor } from "@testing-library/react";
 import { useLogoSoup } from "../src/react/use-logo-soup";
 
@@ -223,6 +224,50 @@ describe("useLogoSoup", () => {
         firstWidth,
       );
     });
+
+    globalThis.Image = originalImage;
+  });
+
+  test("works correctly under React StrictMode (not stuck in loading)", async () => {
+    globalThis.Image = class MockImage {
+      crossOrigin = "";
+      src = "";
+      naturalWidth = 200;
+      naturalHeight = 100;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor() {
+        queueMicrotask(() => {
+          if (this.onload) this.onload();
+        });
+      }
+    } as unknown as typeof Image;
+
+    const strictWrapper = ({ children }: { children: ReactNode }) => (
+      <StrictMode>{children}</StrictMode>
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLogoSoup({
+          logos: [
+            "https://example.com/logo1.png",
+            "https://example.com/logo2.png",
+          ],
+          baseSize: 48,
+          scaleFactor: 0.5,
+        }),
+      { wrapper: strictWrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.normalizedLogos).toHaveLength(2);
+    expect(result.current.error).toBe(null);
 
     globalThis.Image = originalImage;
   });
