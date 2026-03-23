@@ -50,8 +50,18 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     backgroundColor,
   } = options;
 
-  // Trigger processing when options change
+  // Holds a deferred destroy timer so that StrictMode remounts can cancel it
+  // before it fires. On a real unmount no remount follows and the timer
+  // completes, cleaning up blob URLs and other resources.
+  const destroyTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Single effect: process on mount / when options change, cancel + deferred
+  // destroy on cleanup. This satisfies React's setup → cleanup → setup contract:
+  //   setup:   cancel pending destroy (StrictMode remount), start processing
+  //   cleanup: cancel in-flight work, schedule destroy (real unmount lets it fire)
   useEffect(() => {
+    clearTimeout(destroyTimerRef.current);
+
     engine.process({
       logos: stableLogos,
       baseSize,
@@ -62,6 +72,11 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
       cropToContent,
       backgroundColor,
     });
+
+    return () => {
+      engine.cancel();
+      destroyTimerRef.current = setTimeout(() => engine.destroy(), 0);
+    };
   }, [
     engine,
     stableLogos,
@@ -73,9 +88,6 @@ export function useLogoSoup(options: UseLogoSoupOptions): UseLogoSoupResult {
     cropToContent,
     backgroundColor,
   ]);
-
-  // Cleanup on unmount
-  useEffect(() => () => engine.destroy(), [engine]);
 
   return {
     isLoading: state.status === "loading",
